@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SettingsScene" extends="Scene">
+  <interface>
+    <field id="profile" type="string" />
+    <field id="settings" type="assocarray" onChange="startSettings" />
+    <field id="done" type="boolean" />
+    <field id="client" type="node" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/Model.brs" />
+  <script type="text/brightscript" uri="pkg:/source/Settings.brs" />
+  <script type="text/brightscript" uri="pkg:/components/SettingsScene.brs" />
+  <children>
+    <Label id="heading" text="HiPhi · Bridge and zone" translation="[100,100]" width="1720" height="80" />
+    <Label id="status" translation="[100,210]" width="1720" height="120" wrap="true" />
+    <ButtonGroup id="choices" translation="[100,400]" buttons="[&quot;Bridge address&quot;,&quot;Pin listening zone&quot;,&quot;Done&quot;]" />
+    <LabelList id="zoneList" translation="[100,350]" itemSize="[1720,60]" numRows="9" visible="false" />
+    <BridgeTask id="network" />
+  </children>
+</component>

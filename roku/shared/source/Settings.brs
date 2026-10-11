@@ -1,0 +1,39 @@
+function LoadSettings(profile as string) as object
+    reg = SettingsRegistry(profile)
+    return { bridge: NormalizeBridge(reg.Read("bridge")), zone: reg.Read("zone") }
+end function
+
+sub SaveSettings(profile as string, bridge as string, zone as string)
+    reg = SettingsRegistry(profile)
+    reg.Write("bridge", bridge)
+    reg.Write("zone", zone)
+    reg.Flush()
+end sub
+
+sub RunHiPhi(sceneName as string, profile as string)
+    screen = CreateObject("roSGScreen")
+    port = CreateObject("roMessagePort")
+    screen.SetMessagePort(port)
+    scene = screen.CreateScene(sceneName)
+    scene.profile = profile
+    scene.settings = LoadSettings(profile)
+    scene.ObserveField("done", port)
+    screen.Show()
+    while true
+        msg = Wait(0, port)
+        if type(msg) = "roSGScreenEvent"
+            if msg.IsScreenClosed() then exit while
+        else if type(msg) = "roSGNodeEvent"
+            if msg.GetField() = "done" and msg.GetData() = true
+                screen.Close()
+                exit while
+            end if
+        end if
+    end while
+    scene.client.control = "STOP"
+end sub
+
+function SettingsRegistry(profile as string) as object
+    if m.registryFactory <> invalid then return m.registryFactory(profile)
+    return CreateObject("roRegistrySection", "hiphi-" + profile)
+end function
