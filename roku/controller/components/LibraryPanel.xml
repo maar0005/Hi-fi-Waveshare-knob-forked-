@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LibraryPanel" extends="Group">
+  <interface>
+    <field id="client" type="node" />
+    <field id="snapshot" type="assocarray" onChange="libraryContext" />
+    <field id="open" type="boolean" alwaysNotify="true" onChange="openLibrary" />
+    <field id="done" type="boolean" alwaysNotify="true" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/Model.brs" />
+  <script type="text/brightscript" uri="pkg:/source/LibraryModel.brs" />
+  <script type="text/brightscript" uri="pkg:/components/LibraryPanel.brs" />
+  <children>
+    <Rectangle width="1920" height="1080" color="0x101012FF" />
+    <Label id="libraryTitle" translation="[120,64]" width="1680" height="72" font="font:LargeSystemFont" color="0xEEE8DAFF" />
+    <Label id="libraryCrumbs" translation="[120,148]" width="1680" height="48" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+    <LabelList id="libraryList" translation="[120,230]" itemSize="[1680,74]" numRows="8" itemSpacing="[0,14]" font="font:MediumSystemFont" focusedFont="font:MediumSystemFont" color="0xEEE8DAFF" focusedColor="0x101012FF" focusBitmapBlendColor="0xEEE8DAFF" />
+    <Label id="libraryNotice" translation="[120,952]" width="1680" height="44" font="font:SmallSystemFont" color="0xEEE8DAFF" />
+    <Label id="libraryHint" translation="[120,1010]" width="1680" height="36" text="OK select · Back return · Options library menu" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+  </children>
+</component>

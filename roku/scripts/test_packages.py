@@ -26,10 +26,14 @@ for profile in ['controller', 'screensaver']:
             assert 'screensaver_title=' in manifest
             assert 'sub Main(' not in entry
             assert 'RunScreenSaver()' in entry and 'RunScreenSaverSettings()' in entry
-            assert not any('ControllerScene' in n for n in names)
+            assert not any('ControllerScene' in n or 'LibraryPanel' in n for n in names)
             assert 'artInit(true)' in z.read('components/ArtScene.brs').decode()
         else:
             assert 'screensaver_title=' not in manifest
             assert 'RunScreenSaver' not in entry
             assert 'components/ControllerScene.brs' in names
+            assert 'components/LibraryPanel.brs' in names
+            library = z.read('components/LibraryPanel.brs').decode()
+            assert 'roUrlTransfer' not in library, 'Library network call on render thread'
+            assert 'StandardKeyboardDialog' in library, 'Use current native keyboard'
 print('PASS reproducible packages, entry points and read-only screensaver boundary')

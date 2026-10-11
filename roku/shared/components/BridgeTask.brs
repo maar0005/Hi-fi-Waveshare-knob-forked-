@@ -9,6 +9,7 @@ sub runBridge()
     m.clock.Mark()
     m.state = NewClientState(m.top.readonly)
     m.pending = {}
+    resetLibrary()
     m.sse = invalid
     m.sseReady = false
     m.failures = 0
@@ -70,9 +71,9 @@ function newTransfer(path as string) as object
     return x
 end function
 
-sub startTransfer(role as string, path as string, body as dynamic)
+sub startTransfer(role as string, path as string, body as dynamic, meta = invalid as dynamic)
     x = newTransfer(path)
-    entry = { x: x, role: role, session: m.state.session, zone: m.state.zone, started: m.clock.TotalMilliseconds() }
+    entry = { x: x, role: role, session: m.state.session, zone: m.state.zone, started: m.clock.TotalMilliseconds(), meta: meta }
     m.pending[x.GetIdentity().ToStr()] = entry
     if body = invalid
         started = x.AsyncGetToString()
@@ -151,6 +152,10 @@ sub handleResponse(msg as object)
         failed(entry)
         return
     end if
+    if entry.role = "library" or entry.role = "libraryCommand"
+        libraryResponse(entry, body)
+        return
+    end if
     if entry.role = "zones"
         if type(body.zones) <> "roArray"
             failed(entry)
@@ -186,6 +191,10 @@ sub invalidatePlaying()
 end sub
 
 sub failed(entry as object)
+    if entry.role = "library" or entry.role = "libraryCommand"
+        libraryFailed(entry)
+        return
+    end if
     if entry.role = "command"
         m.state.pending = false
         m.state.uncertain = true
@@ -220,6 +229,7 @@ sub handleRequest(req as dynamic)
             m.pending[key].x.AsyncCancel()
         end for
         m.pending = {}
+        resetLibrary()
         if m.sse <> invalid then m.sse.AsyncCancel()
         m.sse = invalid
         m.sseReady = false
@@ -229,6 +239,8 @@ sub handleRequest(req as dynamic)
         m.nextSse = 0
         m.failures = 0
         publish()
+    else if req.kind = "library" or req.kind = "library_play" or req.kind = "library_close"
+        requestLibrary(req)
     else if req.kind = "command"
         if req.session <> m.state.session or req.zone <> m.state.zone then return
         if not AllowsCommand(m.state, TextField(req, "action"), m.clock.TotalMilliseconds())

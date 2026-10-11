@@ -2,8 +2,11 @@ sub init()
     artInit(false)
     m.controls = false
     m.index = 1
-    m.labels = ["Previous", "Play / Pause", "Next", "Volume −", "Volume +", "Zones / Settings"]
-    m.actions = ["previous", "play_pause", "next", "vol_down", "vol_up", "settings"]
+    m.labels = ["Previous", "Play / Pause", "Next", "Volume −", "Volume +", "Library", "Zones / Settings"]
+    m.actions = ["previous", "play_pause", "next", "vol_down", "vol_up", "library", "settings"]
+    m.library = m.top.FindNode("libraryPanel")
+    m.library.client = m.client
+    m.library.ObserveField("done", "closeLibrary")
     m.timer = m.top.FindNode("hideTimer")
     m.timer.ObserveField("fire", "hideControls")
     m.top.SetFocus(true)
@@ -22,6 +25,7 @@ sub revealControls()
 end sub
 
 sub updateController()
+    if m.library <> invalid then m.library.snapshot = m.snapshot
     m.top.FindNode("controlsMat").visible = m.controls
     label = m.top.FindNode("controlLabel")
     label.visible = m.controls
@@ -50,7 +54,17 @@ sub sendCommand(action as string)
     m.client.request = { kind: "command", action: action, zone: m.snapshot.zone, session: m.snapshot.session }
 end sub
 
+sub closeLibrary()
+    if not m.library.done then return
+    hideControls()
+    m.heldKey = ""
+    m.top.SetFocus(true)
+end sub
+
 function onKeyEvent(key as string, press as boolean) as boolean
+    if m.library <> invalid
+        if m.library.visible then return false
+    end if
     if not press
         m.heldKey = ""
         return false
@@ -83,11 +97,17 @@ function onKeyEvent(key as string, press as boolean) as boolean
             revealControls()
             return true
         end if
-        if key = "left" or key = "up" then m.index = (m.index + 5) mod 6
-        if key = "right" or key = "down" then m.index = (m.index + 1) mod 6
+        count = m.actions.Count()
+        if key = "left" or key = "up" then m.index = (m.index + count - 1) mod count
+        if key = "right" or key = "down" then m.index = (m.index + 1) mod count
         if key = "OK"
             if m.actions[m.index] = "settings"
                 m.top.openSettings = true
+            else if m.actions[m.index] = "library"
+                hideControls()
+                m.timer.control = "stop"
+                m.library.open = true
+                return true
             else
                 sendCommand(m.actions[m.index])
             end if

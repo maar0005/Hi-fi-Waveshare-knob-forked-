@@ -7,8 +7,8 @@ sub Main()
     m.controls = false
     m.heldKey = ""
     m.index = 1
-    m.labels = ["Previous", "Play / Pause", "Next", "Volume -", "Volume +", "Settings"]
-    m.actions = ["previous", "play_pause", "next", "vol_down", "vol_up", "settings"]
+    m.labels = ["Previous", "Play / Pause", "Next", "Volume -", "Volume +", "Library", "Settings"]
+    m.actions = ["previous", "play_pause", "next", "vol_down", "vol_up", "library", "settings"]
     m.timer = {control: "stop"}
     m.client = {}
     m.snapshot = {zone: "pinned-room", session: 3, allowed: {previous: true, play_pause: true, next: true, vol_down: false, vol_up: false}}
@@ -42,6 +42,21 @@ sub Main()
     revealControls()
     hideControls()
     check(not m.controls, "idle timer returns to art")
+    m.library = {visible: false, done: false}
+    m.index = 5
+    revealControls()
+    m.client.request = invalid
+    m.heldKey = ""
+    onKeyEvent("OK", true)
+    check(m.library.open and not m.controls and m.client.request = invalid, "Library opens transient panel without playback")
+    m.library.visible = true
+    check(not onKeyEvent("play", true), "parent controller does not steal keys while Library owns focus")
+    m.library.visible = false
+    m.heldKey = ""
+    m.index = 6
+    revealControls()
+    onKeyEvent("right", true)
+    check(m.index = 0, "seven-action control overlay wraps after Settings")
     if m.failures = 0 then print "PASS all remote tests: "; m.count
 end sub
 
