@@ -42,5 +42,6 @@ if __name__ == '__main__':
         dirty = subprocess.check_output(['git', 'status', '--porcelain', '--', 'roku'], cwd=ROOT, text=True).strip()
         (ROOT / 'dist' / 'BUILDINFO.txt').write_text(f'commit={sha}\nsource_dirty={bool(dirty)}\nTargets are unqualified until exact-artifact hardware tests pass.\n')
         shutil.copyfile(ROOT / 'README.md', ROOT / 'dist' / 'README.md')
+        shutil.copyfile(ROOT / 'LIBRARY.md', ROOT / 'dist' / 'LIBRARY.md')
         for p in outputs:
             print(p)
