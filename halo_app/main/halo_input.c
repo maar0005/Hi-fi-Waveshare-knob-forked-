@@ -2,6 +2,7 @@
  * Volume goes through the same physical-event path as the Dial (controller_input_profile_dial.c binds
  * DIAL_BUILTIN/DIAL_ROTATION to volume, or to zone-picker scroll while the picker is open). */
 #include "halo_input.h"
+#include "halo_navigation.h"
 #include "controller_input.h"
 
 #include <driver/gpio.h>
@@ -84,6 +85,7 @@ void halo_input_drain(void) {
     int delta, total = 0;
     while (s_deltas && xQueueReceive(s_deltas, &delta, 0) == pdTRUE) total += delta;
     if (total == 0) return;
+    if (halo_navigation_encoder(total)) return;
     controller_physical_event_t event = {
         .source_id = CONTROLLER_INPUT_SOURCE_DIAL_BUILTIN,
         .control_id = CONTROLLER_INPUT_CONTROL_DIAL_ROTATION,

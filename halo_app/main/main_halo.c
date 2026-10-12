@@ -12,6 +12,7 @@
 #include "platform/platform_time.h"
 #include "touch_ui.h"
 #include "ui.h"
+#include "halo_navigation.h"
 #include "font_manager.h"
 #include "platform_display_halo.h"
 #include "lvgl.h"
@@ -135,6 +136,7 @@ static void ui_loop_task(void *arg) {
     platform_input_process_events();
     platform_display_process_pending();
     ui_loop_iter();
+    halo_navigation_process();
 
     static bool s_mdns_initialized = false;
     if (s_mdns_init_pending) {

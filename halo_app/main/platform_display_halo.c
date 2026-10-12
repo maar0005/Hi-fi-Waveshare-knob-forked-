@@ -7,6 +7,7 @@
 #include "platform/platform_power.h"
 #include "bridge_client.h"
 #include "ui.h"
+#include "halo_navigation.h"
 #include "halo_st77916_init.h"
 
 #include <inttypes.h>
@@ -86,11 +87,6 @@ static uint16_t s_rotation;
 /* Gesture / art-mode state (art mode = controls hidden, artwork only). */
 static int16_t s_start_x, s_start_y, s_last_x, s_last_y;
 static int64_t s_start_ms;
-static bool s_tracking, s_touch_swallowed;
-static int64_t s_last_tap_ms;
-static int16_t s_last_tap_x, s_last_tap_y;
-static bool s_art_mode;
-static volatile bool s_pending_enter_art, s_pending_exit_art;
 
 /* ---------------- backlight ---------------- */
 void platform_display_set_brightness(int percent) {
@@ -165,70 +161,41 @@ static bool touch_read(int16_t *x, int16_t *y) {
     return true;
 }
 
-/* Same gesture semantics as the Dial: swipe up / double tap -> art mode, swipe down -> exit.
- * Any touch while in art mode exits it and is not delivered to widgets. */
+/* Resolve the gesture before delivering a tap: a swipe never clicks a widget underneath it. */
+static bool s_tracking, s_tap_release;
+static int s_pending_dx, s_pending_dy;
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
+    data->point.x = s_last_x; data->point.y = s_last_y;
+    data->state = LV_INDEV_STATE_RELEASED;
+    if (s_tap_release) { s_tap_release = false; return; }
     int16_t x, y;
     if (touch_read(&x, &y)) {
         if (!s_tracking) {
             s_start_x = x; s_start_y = y;
-            s_start_ms = esp_timer_get_time() / 1000;
-            s_tracking = true;
-            if (s_art_mode) { s_pending_exit_art = true; s_touch_swallowed = true; }
+            s_start_ms = esp_timer_get_time() / 1000; s_tracking = true;
         }
         s_last_x = x; s_last_y = y;
-        data->point.x = x;
-        data->point.y = y;
-        data->state = s_touch_swallowed ? LV_INDEV_STATE_RELEASED : LV_INDEV_STATE_PRESSED;
         return;
     }
-
-    data->point.x = s_last_x;
-    data->point.y = s_last_y;
-    data->state = LV_INDEV_STATE_RELEASED;
     if (!s_tracking) return;
     s_tracking = false;
-    if (s_touch_swallowed) { s_touch_swallowed = false; return; }
-
-    int64_t now_ms = esp_timer_get_time() / 1000;
-    if (now_ms - s_start_ms >= SWIPE_MAX_TIME_MS) return;
-    int16_t dx = s_last_x - s_start_x, dy = s_last_y - s_start_y;
+    int dx = s_last_x - s_start_x, dy = s_last_y - s_start_y;
+    int64_t elapsed = esp_timer_get_time() / 1000 - s_start_ms;
+    int raw_dx = dx, raw_dy = dy;
     if (s_rotation == 180) { dx = -dx; dy = -dy; }
-
-    if (dy < -SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-        if (bridge_client_is_ready_for_art_mode()) {
-            ESP_LOGI(TAG, "Swipe up - art mode");
-            s_pending_enter_art = true;
-        }
-    } else if (dy > SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-        ESP_LOGI(TAG, "Swipe down - exit art mode");
-        s_pending_exit_art = true;
-    } else if (abs(dx) < DOUBLE_TAP_MAX_DISTANCE && abs(dy) < DOUBLE_TAP_MAX_DISTANCE) {
-        if (now_ms - s_last_tap_ms < DOUBLE_TAP_MAX_MS &&
-            abs(s_last_x - s_last_tap_x) < DOUBLE_TAP_MAX_DISTANCE &&
-            abs(s_last_y - s_last_tap_y) < DOUBLE_TAP_MAX_DISTANCE) {
-            if (bridge_client_is_ready_for_art_mode()) {
-                ESP_LOGI(TAG, "Double tap - art mode");
-                s_pending_enter_art = true;
-            }
-            s_last_tap_ms = 0;
-        } else {
-            s_last_tap_ms = now_ms;
-            s_last_tap_x = s_last_x;
-            s_last_tap_y = s_last_y;
-        }
+    if (elapsed < SWIPE_MAX_TIME_MS && (abs(dx) >= SWIPE_MIN_DISTANCE || abs(dy) >= SWIPE_MIN_DISTANCE)) {
+        s_pending_dx = dx; s_pending_dy = dy;
+    } else if (abs(raw_dx) < DOUBLE_TAP_MAX_DISTANCE && abs(raw_dy) < DOUBLE_TAP_MAX_DISTANCE) {
+        data->point.x = s_last_x; data->point.y = s_last_y;
+        data->state = LV_INDEV_STATE_PRESSED; s_tap_release = true;
     }
 }
-
 void platform_display_process_pending(void) {
-    if (s_pending_enter_art) {
-        s_pending_enter_art = false;
-        if (!s_art_mode) { s_art_mode = true; ui_set_controls_visible(false); }
-    }
-    if (s_pending_exit_art) {
-        s_pending_exit_art = false;
-        if (s_art_mode) { s_art_mode = false; ui_set_controls_visible(true); }
+    if (s_pending_dx || s_pending_dy) {
+        int dx = s_pending_dx, dy = s_pending_dy;
+        s_pending_dx = s_pending_dy = 0;
+        halo_navigation_swipe(dx, dy);
     }
 }
 
