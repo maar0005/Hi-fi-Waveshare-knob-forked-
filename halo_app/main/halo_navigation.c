@@ -1364,7 +1364,8 @@ void halo_navigation_process(void) {
       snprintf(text, sizeof(text), "On your phone:\nJoin %s\nOpen 192.168.4.1\nOr use Wi-Fi in Settings.", platform_provisioning_ssid());
     } else if (!has_ip) {
       snprintf(title, sizeof(title), "Connecting to Wi-Fi");
-      snprintf(text, sizeof(text), "%s\nAttempt %d of %d\nUse Wi-Fi in Settings to change networks.", wifi_mgr_get_last_error(), wifi_mgr_get_retry_count(), wifi_mgr_get_retry_max());
+      const char *error = wifi_mgr_get_last_error();
+      snprintf(text, sizeof(text), "%s\nAttempt %d of %d\nUse Wi-Fi in Settings to change networks.", error && *error ? error : "Waiting for network", wifi_mgr_get_retry_count(), wifi_mgr_get_retry_max());
     } else if (cfg.durability == CONTROLLER_CONFIG_DURABILITY_DEGRADED_COMMIT || cfg.durability == CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY) {
       snprintf(title, sizeof(title), "Settings storage warning");
       snprintf(text, sizeof(text), "Changes may not survive a restart.\nSee Connection in Settings.");

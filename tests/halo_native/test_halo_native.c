@@ -108,7 +108,7 @@ bool platform_display_save_brightness(int percent) { saved_brightness = percent;
 bool wifi_mgr_is_ap_mode(void) { return fixture_ap; }
 bool wifi_mgr_start_provisioning(void) { fixture_ap = true; return true; }
 const char *wifi_mgr_get_hostname(void) { return "hiphi-halo-test"; }
-const char *wifi_mgr_get_last_error(void) { return "Network unavailable"; }
+const char *wifi_mgr_get_last_error(void) { return NULL; }
 int wifi_mgr_get_retry_count(void) { return 2; }
 int wifi_mgr_get_retry_max(void) { return 5; }
 const char *platform_provisioning_ssid(void) { return "hiphi-halo-setup"; }
@@ -452,7 +452,10 @@ int main(int argc, char **argv) {
   assert(strstr(lv_label_get_text(detail_label), "192.168.4.1"));
   assert(halo_navigation_encoder(1));
   snapshot(dir, "setup");
-  fixture_ap = false; fixture_has_ip = true; fixture_ready = false;
+  fixture_ap = false; fixture_has_ip = false;
+  advance(1100); halo_navigation_process();
+  assert(recovery_active && strstr(recovery_text, "Waiting for network"));
+  fixture_has_ip = true; fixture_ready = false;
   advance(1100); halo_navigation_process();
   assert(recovery_active && !strcmp(recovery_title, "Music connection"));
   fixture_ready = true;
