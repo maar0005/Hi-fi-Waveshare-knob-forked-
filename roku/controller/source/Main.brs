@@ -1,9 +1,9 @@
 sub Main()
     while true
         settings = LoadSettings("controller")
-        if settings.bridge = "" or settings.zone = "" then RunHiPhi("SettingsScene", "controller")
+        if settings.bridge = "" or settings.zone = "" then RunHiPhi("ControllerSettingsScene", "controller")
         if not RunController() then exit while
-        RunHiPhi("SettingsScene", "controller")
+        RunHiPhi("ControllerSettingsScene", "controller")
     end while
 end sub
 

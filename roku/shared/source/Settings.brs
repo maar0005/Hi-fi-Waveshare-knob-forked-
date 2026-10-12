@@ -21,7 +21,7 @@ sub RunHiPhi(sceneName as string, profile as string)
     memory = StartMemoryMonitoring(port)
     UpdateMemoryPressure(memory, scene)
     screen.Show()
-    if sceneName = "SettingsScene"
+    if sceneName = "SettingsScene" or sceneName = "ControllerSettingsScene"
         if scene.dialog = invalid
             if scene.FindNode("zoneList").visible
                 scene.FindNode("zoneList").SetFocus(true)

@@ -34,6 +34,9 @@ for profile in ['controller', 'screensaver']:
             assert 'screensaver_title=' in manifest
             assert 'title' not in fields, 'title misclassifies standalone screensaver as a channel'
             assert 'sub Main(' not in entry
+            for source in names:
+                if source.endswith('.brs'):
+                    assert 'function onkeyevent(' not in z.read(source).decode().lower(), 'Screensaver package must not contain key handlers'
             assert 'RunScreenSaver()' in entry and 'RunScreenSaverSettings()' in entry
             assert not any('ControllerScene' in n or 'LibraryPanel' in n for n in names)
             assert 'artInit(true)' in z.read('components/ArtScene.brs').decode()

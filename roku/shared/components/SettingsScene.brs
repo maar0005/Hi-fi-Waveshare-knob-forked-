@@ -127,7 +127,7 @@ sub closeZones()
     m.choices.SetFocus(true)
 end sub
 
-function onKeyEvent(key as string, press as boolean) as boolean
+function handleSettingsKey(key as string, press as boolean) as boolean
     if press and key = "back"
         if m.zoneList.visible
             closeZones()
