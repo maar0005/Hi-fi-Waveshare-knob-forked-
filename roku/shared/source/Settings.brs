@@ -37,3 +37,26 @@ function SettingsRegistry(profile as string) as object
     if m.registryFactory <> invalid then return m.registryFactory(profile)
     return CreateObject("roRegistrySection", "hiphi-" + profile)
 end function
+
+function SettingsStatus(state as dynamic) as string
+    if type(state) <> "roAssociativeArray" then return "Connecting"
+    connection = TextField(state, "notice")
+    if connection = ""
+        connection = "Connecting"
+        if TrueField(state, "online") then connection = "Connected"
+    end if
+    room = "Not selected"
+    zoneId = TextField(state, "zone")
+    if zoneId <> ""
+        room = "Saved room unavailable"
+        if type(state.zones) = "roArray"
+            for each zone in state.zones
+                if TextField(zone, "zone_id") = zoneId
+                    room = TextField(zone, "zone_name")
+                    if room = "" then room = "Selected room"
+                end if
+            end for
+        end if
+    end if
+    return TextField(state, "bridge") + Chr(10) + connection + Chr(10) + "Pinned room: " + room
+end function

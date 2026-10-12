@@ -2,9 +2,25 @@ function NormalizeBridge(value as dynamic) as string
     if type(value) <> "String" and type(value) <> "roString" then return ""
     value = value.Trim()
     if Len(value) > 256 then return ""
-    re = CreateObject("roRegex", "^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$", "i")
-    if not re.IsMatch(value) then return ""
-    if Right(value, 1) = "/" then value = Left(value, Len(value) - 1)
+    scheme = "http://"
+    authority = value
+    if Left(LCase(value), 7) = "http://"
+        authority = Mid(value, 8)
+    else if Left(LCase(value), 8) = "https://"
+        scheme = "https://"
+        authority = Mid(value, 9)
+    end if
+    if Right(authority, 1) = "/" then authority = Left(authority, Len(authority) - 1)
+    re = CreateObject("roRegex", "^[A-Za-z0-9.-]+(:[0-9]{1,5})?$", "")
+    if not re.IsMatch(authority) then return ""
+    colon = Instr(1, authority, ":")
+    if colon = 0
+        authority += ":8088"
+    else
+        port = Val(Mid(authority, colon + 1))
+        if port < 1 or port > 65535 then return ""
+    end if
+    value = scheme + authority
     return value
 end function
 

@@ -58,6 +58,14 @@ sub Main()
     check(NormalizeBridge("http://user:secret@host") = "", "credentials rejected")
     check(NormalizeBridge("http://host/path") = "", "UI URL not bridge root")
     check(NormalizeBridge("file:///tmp/x") = "", "non HTTP scheme rejected")
+    check(NormalizeBridge("192.168.1.2") = "http://192.168.1.2:8088", "bare IP supplies HTTP and default UHC port")
+    check(NormalizeBridge(" bridge.local/ ") = "http://bridge.local:8088", "bare hostname trims and accepts trailing slash")
+    check(NormalizeBridge("bridge.local:9000") = "http://bridge.local:9000", "bare hostname preserves explicit port")
+    check(NormalizeBridge("http://bridge.local") = "http://bridge.local:8088", "explicit HTTP without port uses 8088")
+    check(NormalizeBridge("HTTPS://bridge.local") = "https://bridge.local:8088", "HTTPS preserved with default port and normalized scheme")
+    check(NormalizeBridge("https://bridge.local:443") = "https://bridge.local:443", "explicit HTTPS port preserved")
+    check(NormalizeBridge("bridge.local:0") = "" and NormalizeBridge("bridge.local:65536") = "", "invalid explicit ports rejected")
+    check(NormalizeBridge("bridge.local/path") = "" and NormalizeBridge("user:secret@bridge.local") = "", "bare paths and credentials still rejected")
     networkTests()
     transferTests()
     settingsTests()
@@ -256,5 +264,13 @@ sub settingsTests()
     SaveSettings("controller", "http://new:8088/", "c")
     check(LoadSettings("controller").bridge = "http://new:8088", "loaded bridge root normalized")
     check(LoadSettings("screensaver").zone = "b", "controller settings cannot overwrite screensaver selection")
+    status = {bridge: "http://bridge:8088", zone: "roon:a-long-internal-zone-id", notice: "", online: true, zones: [{zone_id: "roon:a-long-internal-zone-id", zone_name: "Front Family Room"}]}
+    text = SettingsStatus(status)
+    check(Instr(1, text, "Connected") > 0 and Instr(1, text, "Pinned room: Front Family Room") > 0, "successful pin shows connection and readable room name")
+    check(Instr(1, text, "roon:a-long-internal-zone-id") = 0, "internal ID never crowds out pin confirmation")
+    status.zones = []
+    check(Instr(1, SettingsStatus(status), "Saved room unavailable") > 0, "missing pin reports recovery without another-room fallback")
+    status.zone = ""
+    check(Instr(1, SettingsStatus(status), "Not selected") > 0, "unconfigured pin is explicit")
     m.registryFactory = invalid
 end sub

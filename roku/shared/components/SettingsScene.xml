@@ -11,7 +11,7 @@
   <script type="text/brightscript" uri="pkg:/components/SettingsScene.brs" />
   <children>
     <Label id="heading" text="HiPhi · Bridge and zone" translation="[100,100]" width="1720" height="80" />
-    <Label id="status" translation="[100,210]" width="1720" height="120" wrap="true" />
+    <Label id="status" translation="[100,210]" width="1720" height="160" wrap="true" font="font:SmallSystemFont" />
     <ButtonGroup id="choices" translation="[100,400]" buttons="[&quot;Bridge address&quot;,&quot;Pin listening zone&quot;,&quot;Done&quot;]" />
     <LabelList id="zoneList" translation="[100,350]" itemSize="[1720,60]" numRows="9" visible="false" />
     <BridgeTask id="network" />

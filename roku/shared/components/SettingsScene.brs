@@ -19,7 +19,7 @@ end sub
 
 sub settingsSnapshot()
     m.status = m.client.snapshot
-    m.top.FindNode("status").text = m.status.bridge + Chr(10) + m.status.notice + Chr(10) + "Pinned zone: " + m.status.zone
+    m.top.FindNode("status").text = SettingsStatus(m.status)
 end sub
 
 sub chooseSetting()
@@ -34,8 +34,9 @@ sub chooseSetting()
 end sub
 
 sub bridgeDialog()
-    dialog = CreateObject("roSGNode", "KeyboardDialog")
-    dialog.title = "UHC bridge root address"
+    dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
+    dialog.title = "UHC bridge address"
+    dialog.message = ["Enter a host or IP address. Default port: 8088."]
     dialog.text = m.saved.bridge
     dialog.buttons = ["Connect", "Cancel"]
     dialog.ObserveField("buttonSelected", "bridgeChosen")
@@ -47,7 +48,7 @@ sub bridgeChosen()
     if dialog.buttonSelected = 0
         bridge = NormalizeBridge(dialog.text)
         if bridge = ""
-            dialog.title = "Use http://host:8088 or https://host"
+            dialog.title = "Enter a host or IP, optionally :port"
             return
         end if
         if bridge <> m.saved.bridge then m.saved.zone = ""
