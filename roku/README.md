@@ -66,7 +66,7 @@ Record the Actions run, Git SHA, ZIP SHA-256, model, full OS/build and remote ty
 
 The controller adds only its manifest, entry point and input/overlay component. The screensaver adds only its manifest and two entry points; it has no ControllerScene. Shared settings UI runs in a distinct settings entry point; shared networking denies all screensaver commands even if a command request is injected. Artwork models and provider SDKs stay on UHC.
 
-The current manifests use `rsg_version=1.2` for the OS 15 personal sideload trial. Roku's current certification rules require 1.3 for publication; public-store release must deliberately migrate/qualify that observer model. No publication or certification approval is implied.
+Both manifests use `rsg_version=1.3`; set minimum firmware to **15.1** in the Developer Dashboard when uploading the signed packages. Artwork uses `screensaver_title` without `title`, so Roku classifies it as a standalone screensaver. Do not add `Main()` or `RunUserInterface()` to silence channel analysis errors. RSG 1.3 runtime behavior still requires exact-package TV validation; local compilation does not establish certification or hardware success.
 
 Pinned desktop compiler/interpreter dependencies are development-only and never enter the Roku ZIP. Patched archive/URI/UUID dependencies are overridden in the lockfile. npm audit still reports high-severity glob-pattern issues through the current compiler/interpreter stack; checks use fixed repository globs and local source only, not untrusted patterns or archives. Do not expose these developer tools as an upload service. This limitation is recorded rather than hidden by an audit suppression.
 

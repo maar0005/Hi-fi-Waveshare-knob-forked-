@@ -18,6 +18,9 @@ for profile in ['controller', 'screensaver']:
         entry = z.read('source/Main.brs').decode()
         manifest = z.read('manifest').decode()
         assert manifest.endswith('\n')
+        fields = dict(line.split('=', 1) for line in manifest.splitlines() if '=' in line)
+        assert fields['rsg_version'] == '1.3'
+        assert int(fields['build_version']) >= 1
         art = z.read('components/ArtScene.brs').decode()
         assert 'loadDisplayMode = "scaleToFit"' in art, 'Second centered crop would lose subjects'
         assert 'roUrlTransfer' not in art, 'Network transfer on render thread'
@@ -25,6 +28,7 @@ for profile in ['controller', 'screensaver']:
         assert 'SaveSettings(m.top.profile, m.saved.bridge, m.saved.zone)' in z.read('components/SettingsScene.brs').decode(), 'Room selection must persist exact room identity'
         if profile == 'screensaver':
             assert 'screensaver_title=' in manifest
+            assert 'title' not in fields, 'title misclassifies standalone screensaver as a channel'
             assert 'sub Main(' not in entry
             assert 'RunScreenSaver()' in entry and 'RunScreenSaverSettings()' in entry
             assert not any('ControllerScene' in n or 'LibraryPanel' in n for n in names)
