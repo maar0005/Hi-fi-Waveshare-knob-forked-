@@ -158,19 +158,6 @@
         "roon-knob"
       ],
       "line_regex": "roon-knob/docs/images/hiphi-logo-512\\.png"
-    },
-    {
-      "id": "critique-checkout-provenance",
-      "category": "historical-provenance",
-      "owner": "#273",
-      "retirement": "Permanent for archived critique targets identifying the checkout used for review.",
-      "path_globs": [
-        ".impeccable/critique/*.md"
-      ],
-      "tokens": [
-        "roon-knob"
-      ],
-      "line_regex": "^target_(?:identity|path):.*?/roon-knob/"
     }
   ],
   "required": [
