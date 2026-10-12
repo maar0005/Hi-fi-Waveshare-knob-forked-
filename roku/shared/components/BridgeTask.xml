@@ -5,7 +5,10 @@
     <field id="settings" type="assocarray" />
     <field id="request" type="assocarray" alwaysNotify="true" />
     <field id="snapshot" type="assocarray" alwaysNotify="true" />
+    <field id="libraryResult" type="assocarray" alwaysNotify="true" />
   </interface>
   <script type="text/brightscript" uri="pkg:/source/Model.brs" />
+  <script type="text/brightscript" uri="pkg:/source/LibraryModel.brs" />
+  <script type="text/brightscript" uri="pkg:/components/BridgeLibrary.brs" />
   <script type="text/brightscript" uri="pkg:/components/BridgeTask.brs" />
 </component>

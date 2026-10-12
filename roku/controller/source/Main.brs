@@ -1,9 +1,9 @@
 sub Main()
     while true
         settings = LoadSettings("controller")
-        if settings.bridge = "" or settings.zone = "" then RunHiPhi("SettingsScene", "controller")
+        if settings.bridge = "" or settings.zone = "" then RunHiPhi("ControllerSettingsScene", "controller")
         if not RunController() then exit while
-        RunHiPhi("SettingsScene", "controller")
+        RunHiPhi("ControllerSettingsScene", "controller")
     end while
 end sub
 
@@ -15,10 +15,16 @@ function RunController() as boolean
     scene.profile = "controller"
     scene.settings = LoadSettings("controller")
     scene.ObserveField("openSettings", port)
+    memory = StartMemoryMonitoring(port)
+    UpdateMemoryPressure(memory, scene)
     screen.Show()
+    scene.SetFocus(true)
     settingsRequested = false
     while true
-        msg = Wait(0, port)
+        msg = Wait(5000, port)
+        if msg = invalid or type(msg) = "roAppMemoryNotificationEvent" or type(msg) = "roDeviceInfoEvent"
+            UpdateMemoryPressure(memory, scene)
+        end if
         if type(msg) = "roSGScreenEvent"
             if msg.IsScreenClosed() then exit while
         else if type(msg) = "roSGNodeEvent"

@@ -2,9 +2,25 @@ function NormalizeBridge(value as dynamic) as string
     if type(value) <> "String" and type(value) <> "roString" then return ""
     value = value.Trim()
     if Len(value) > 256 then return ""
-    re = CreateObject("roRegex", "^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$", "i")
-    if not re.IsMatch(value) then return ""
-    if Right(value, 1) = "/" then value = Left(value, Len(value) - 1)
+    scheme = "http://"
+    authority = value
+    if Left(LCase(value), 7) = "http://"
+        authority = Mid(value, 8)
+    else if Left(LCase(value), 8) = "https://"
+        scheme = "https://"
+        authority = Mid(value, 9)
+    end if
+    if Right(authority, 1) = "/" then authority = Left(authority, Len(authority) - 1)
+    re = CreateObject("roRegex", "^[A-Za-z0-9.-]+(:[0-9]{1,5})?$", "")
+    if not re.IsMatch(authority) then return ""
+    colon = Instr(1, authority, ":")
+    if colon = 0
+        authority += ":8088"
+    else
+        port = Val(Mid(authority, colon + 1))
+        if port < 1 or port > 65535 then return ""
+    end if
+    value = scheme + authority
     return value
 end function
 
@@ -24,7 +40,7 @@ function HasZone(zones as dynamic, zone as string) as boolean
 end function
 
 function NewClientState(readonly as boolean) as object
-    return { readonly: readonly, session: 0, bridge: "", zone: "", zones: [], playing: invalid, online: false, pending: false, uncertain: false, freshAt: -100000, notice: "Choose bridge and zone" }
+    return { readonly: readonly, session: 0, bridge: "", zone: "", zones: [], playing: invalid, online: false, pending: false, uncertain: false, freshAt: -100000, notice: "Connect to your music bridge and pick a zone" }
 end function
 
 sub ResetClient(state as object, bridge as string, zone as string)
@@ -38,8 +54,8 @@ sub ResetClient(state as object, bridge as string, zone as string)
     state.uncertain = false
     state.freshAt = -100000
     state.notice = "Connecting"
-    if zone = "" then state.notice = "Pin a listening zone in settings"
-    if bridge = "" then state.notice = "Configure bridge and pinned zone in settings"
+    if zone = "" then state.notice = "Pick a zone in Settings"
+    if bridge = "" then state.notice = "Connect to your music bridge in Settings"
 end sub
 
 function AcceptPlaying(state as object, session as integer, zone as string, body as dynamic, now as integer) as boolean

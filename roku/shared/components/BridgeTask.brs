@@ -9,6 +9,7 @@ sub runBridge()
     m.clock.Mark()
     m.state = NewClientState(m.top.readonly)
     m.pending = {}
+    resetLibrary()
     m.sse = invalid
     m.sseReady = false
     m.failures = 0
@@ -48,7 +49,7 @@ sub runBridge()
         end if
         if m.state.online and now - m.state.freshAt > 45000
             m.state.online = false
-            m.state.notice = "Connection stale — reconnecting"
+            m.state.notice = "Reconnecting to your music…"
             publish()
         end if
     end while
@@ -70,9 +71,9 @@ function newTransfer(path as string) as object
     return x
 end function
 
-sub startTransfer(role as string, path as string, body as dynamic)
+sub startTransfer(role as string, path as string, body as dynamic, meta = invalid as dynamic)
     x = newTransfer(path)
-    entry = { x: x, role: role, session: m.state.session, zone: m.state.zone, started: m.clock.TotalMilliseconds() }
+    entry = { x: x, role: role, session: m.state.session, zone: m.state.zone, started: m.clock.TotalMilliseconds(), meta: meta }
     m.pending[x.GetIdentity().ToStr()] = entry
     if body = invalid
         started = x.AsyncGetToString()
@@ -136,7 +137,7 @@ sub handleResponse(msg as object)
         m.state.pending = false
         ' HTTP acceptance is not proof of the resulting playback state.
         m.state.uncertain = true
-        m.state.notice = "Refreshing after command"
+        m.state.notice = "Updating playback…"
         invalidatePlaying()
         publish()
         return
@@ -151,6 +152,10 @@ sub handleResponse(msg as object)
         failed(entry)
         return
     end if
+    if entry.role = "library" or entry.role = "libraryCommand"
+        libraryResponse(entry, body)
+        return
+    end if
     if entry.role = "zones"
         if type(body.zones) <> "roArray"
             failed(entry)
@@ -161,8 +166,8 @@ sub handleResponse(msg as object)
         if not HasZone(body.zones, m.state.zone)
             m.state.playing = invalid
             m.state.online = false
-            m.state.notice = "Saved zone unavailable — repin in settings"
-            if m.state.zone = "" then m.state.notice = "Pin a listening zone in settings"
+            m.state.notice = "Zone unavailable — pick another in Settings"
+            if m.state.zone = "" then m.state.notice = "Pick a zone in Settings"
         end if
         m.nextRead = 0
     else if entry.role = "playing"
@@ -186,14 +191,18 @@ sub invalidatePlaying()
 end sub
 
 sub failed(entry as object)
+    if entry.role = "library" or entry.role = "libraryCommand"
+        libraryFailed(entry)
+        return
+    end if
     if entry.role = "command"
         m.state.pending = false
         m.state.uncertain = true
-        m.state.notice = "Command outcome unknown — checking state"
+        m.state.notice = "Checking whether playback changed…"
         invalidatePlaying()
     else
         m.state.online = false
-        m.state.notice = "Bridge unavailable — reconnecting"
+        m.state.notice = "Music bridge offline — reconnecting"
         m.failures++
         delay = RetryDelay(m.failures)
         m.nextRead = m.clock.TotalMilliseconds() + delay
@@ -220,6 +229,7 @@ sub handleRequest(req as dynamic)
             m.pending[key].x.AsyncCancel()
         end for
         m.pending = {}
+        resetLibrary()
         if m.sse <> invalid then m.sse.AsyncCancel()
         m.sse = invalid
         m.sseReady = false
@@ -229,16 +239,18 @@ sub handleRequest(req as dynamic)
         m.nextSse = 0
         m.failures = 0
         publish()
+    else if req.kind = "library" or req.kind = "library_play" or req.kind = "library_close"
+        requestLibrary(req)
     else if req.kind = "command"
         if req.session <> m.state.session or req.zone <> m.state.zone then return
         if not AllowsCommand(m.state, TextField(req, "action"), m.clock.TotalMilliseconds())
-            m.state.notice = "Control unavailable — refreshing state"
+            m.state.notice = "Control unavailable — updating playback…"
             m.nextRead = 0
             publish()
             return
         end if
         m.state.pending = true
-        m.state.notice = "Sending command"
+        m.state.notice = "Updating playback…"
         startTransfer("command", "/control", { zone_id: m.state.zone, action: req.action })
         publish()
     else if req.kind = "refresh"

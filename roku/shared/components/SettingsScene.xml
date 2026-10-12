@@ -8,12 +8,16 @@
   </interface>
   <script type="text/brightscript" uri="pkg:/source/Model.brs" />
   <script type="text/brightscript" uri="pkg:/source/Settings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/Memory.brs" />
   <script type="text/brightscript" uri="pkg:/components/SettingsScene.brs" />
   <children>
-    <Label id="heading" text="HiPhi · Bridge and zone" translation="[100,100]" width="1720" height="80" />
-    <Label id="status" translation="[100,210]" width="1720" height="120" wrap="true" />
-    <ButtonGroup id="choices" translation="[100,400]" buttons="[&quot;Bridge address&quot;,&quot;Pin listening zone&quot;,&quot;Done&quot;]" />
-    <LabelList id="zoneList" translation="[100,350]" itemSize="[1720,60]" numRows="9" visible="false" />
+    <Rectangle width="1920" height="1080" color="0x101012FF" />
+    <Label id="heading" text="Settings" translation="[120,80]" width="1680" height="80" font="font:LargeSystemFont" color="0xEEE8DAFF" />
+    <Label id="status" translation="[120,200]" width="1680" height="160" color="0xEEE8DAFF" wrap="true" font="font:SmallSystemFont" />
+    <ButtonGroup id="choices" translation="[120,400]" buttons="[&quot;Find a music bridge&quot;,&quot;Enter bridge address&quot;,&quot;Pick a zone&quot;,&quot;Done&quot;]" />
+    <LabelList id="zoneList" translation="[120,400]" itemSize="[1680,74]" itemSpacing="[0,14]" numRows="5" font="font:MediumSystemFont" focusedFont="font:MediumSystemFont" color="0xEEE8DAFF" focusedColor="0x101012FF" focusBitmapBlendColor="0xEEE8DAFF" visible="false" />
+    <Label id="settingsHint" translation="[120,980]" width="1680" height="36" text="Your zone is saved for next time · Back: artwork" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+    <DiscoveryTask id="discovery" />
     <BridgeTask id="network" />
   </children>
 </component>

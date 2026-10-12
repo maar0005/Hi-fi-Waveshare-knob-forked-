@@ -110,7 +110,10 @@
       "retirement": "Remove only after dual advertise/query compatibility is deployed and old consumers have migrated.",
       "path_globs": [
         "idf_app/main/platform_mdns_idf.c",
-        "frame_app/main/platform_mdns_frame.c"
+        "frame_app/main/platform_mdns_frame.c",
+        "roku/README.md",
+        "roku/shared/components/DiscoveryTask.brs",
+        "roku/shared/source/Discovery.brs"
       ],
       "tokens": [
         "_roonknob"
@@ -142,6 +145,19 @@
         "roon-knob"
       ],
       "line_regex": "^roon-knob/"
+    },
+    {
+      "id": "roku-logo-source-provenance",
+      "category": "historical-provenance",
+      "owner": "#273",
+      "retirement": "Permanent while the logo source remains the referenced repository asset.",
+      "path_globs": [
+        "roku/branding/README.md"
+      ],
+      "tokens": [
+        "roon-knob"
+      ],
+      "line_regex": "roon-knob/docs/images/hiphi-logo-512\\.png"
     }
   ],
   "required": [
