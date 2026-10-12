@@ -82,8 +82,8 @@ static bool s_hardware_ready, s_lvgl_ready;
 static uint16_t s_rotation;
 
 /* Gesture / art-mode state (art mode = controls hidden, artwork only). */
-static int16_t s_start_x, s_start_y, s_last_x, s_last_y;
-static int64_t s_start_ms;
+static int16_t s_last_x, s_last_y;
+
 
 /* ---------------- backlight ---------------- */
 void platform_display_set_brightness(int percent) {
@@ -158,44 +158,18 @@ static bool touch_read(int16_t *x, int16_t *y) {
     return true;
 }
 
-/* Resolve the gesture before delivering a tap: a swipe never clicks a widget underneath it. */
-static bool s_tracking, s_tap_release;
-static int s_pending_dx, s_pending_dy;
+/* Feed the real pointer stream to LVGL: its scroll engine cancels clicks on
+ * dragged widgets and provides pressed feedback, momentum and scroll snapping. */
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
-    data->point.x = s_last_x; data->point.y = s_last_y;
-    data->state = LV_INDEV_STATE_RELEASED;
-    if (s_tap_release) { s_tap_release = false; return; }
     int16_t x, y;
     if (touch_read(&x, &y)) {
-        if (!s_tracking) {
-            s_start_x = x; s_start_y = y;
-            s_start_ms = esp_timer_get_time() / 1000; s_tracking = true;
-        }
         s_last_x = x; s_last_y = y;
-        return;
-    }
-    if (!s_tracking) return;
-    s_tracking = false;
-    int dx = s_last_x - s_start_x, dy = s_last_y - s_start_y;
-    int64_t elapsed = esp_timer_get_time() / 1000 - s_start_ms;
-    controller_touch_t gesture=controller_navigation_touch(dx,dy,elapsed,s_rotation);
-    if(gesture==CONTROLLER_TOUCH_UP||gesture==CONTROLLER_TOUCH_DOWN) {
-        s_pending_dx=0;s_pending_dy=gesture==CONTROLLER_TOUCH_UP?-60:60;
-    }else if(gesture==CONTROLLER_TOUCH_LEFT||gesture==CONTROLLER_TOUCH_RIGHT){
-        s_pending_dx=gesture==CONTROLLER_TOUCH_LEFT?-60:60;s_pending_dy=0;
-    }else if(gesture==CONTROLLER_TOUCH_TAP){
-        data->point.x=s_last_x;data->point.y=s_last_y;
-        data->state=LV_INDEV_STATE_PRESSED;s_tap_release=true;
-    }
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else data->state = LV_INDEV_STATE_RELEASED;
+    data->point.x = s_last_x; data->point.y = s_last_y;
 }
-void platform_display_process_pending(void) {
-    if (s_pending_dx || s_pending_dy) {
-        int dx = s_pending_dx, dy = s_pending_dy;
-        s_pending_dx = s_pending_dy = 0;
-        halo_navigation_swipe(dx, dy);
-    }
-}
+void platform_display_process_pending(void) { }
 
 /* ---------------- LVGL flush ---------------- */
 static void rotate180_rgb565(const uint16_t *src, uint16_t *dst, int n) {

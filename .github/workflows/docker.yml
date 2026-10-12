@@ -40,6 +40,14 @@ jobs:
       - name: Install runtime test dependency
         run: sudo apt-get update -qq && sudo apt-get install -y libcjson-dev
 
+      - name: Test HALO native touch UI
+        run: |
+          git clone --quiet --depth 1 --branch v9.5.0 https://github.com/lvgl/lvgl.git /tmp/halo-test-lvgl
+          test "$(git -C /tmp/halo-test-lvgl rev-parse HEAD)" = 85aa60d18b3d5e5588d7b247abf90198f07c8a63
+          cmake -S tests/halo_native -B /tmp/halo-native-build -DLVGL_SOURCE=/tmp/halo-test-lvgl -DHALO_SANITIZE=ON
+          cmake --build /tmp/halo-native-build -j2
+          /tmp/halo-native-build/halo_native_checks
+
       - name: Test shared configuration contracts
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Icommon tests/test_controller_connection.c common/controller_connection.c -o /tmp/test-controller-connection
