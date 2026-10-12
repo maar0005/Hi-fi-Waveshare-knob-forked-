@@ -8,9 +8,17 @@ set(LV_BUILD_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h" CACHE STRING "" F
 if(NOT LVGL_SOURCE)
   message(FATAL_ERROR "Pass LVGL_SOURCE (HALO's pinned LVGL checkout)")
 endif()
+# SDK substitutes exist only in the native build tree. Keeping templates out of
+# the production header index prevents them from impersonating ESP-IDF headers.
+file(GLOB_RECURSE HALO_TEST_STUBS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/stubs/*.h.in")
+foreach(stub IN LISTS HALO_TEST_STUBS)
+  file(RELATIVE_PATH stub_relative "${CMAKE_CURRENT_SOURCE_DIR}/stubs" "${stub}")
+  string(REGEX REPLACE "\\.in$" "" stub_header "${stub_relative}")
+  configure_file("${stub}" "${CMAKE_CURRENT_BINARY_DIR}/stubs/${stub_header}" COPYONLY)
+endforeach()
 add_subdirectory(${LVGL_SOURCE} lvgl)
 add_executable(halo_native_checks test_halo_native.c ../../common/controller_library.c ../../common/controller_navigation.c ../../idf_app/main/fonts/lato_22.c ../../idf_app/main/fonts/notosans_28.c ../../idf_app/main/fonts/material_icons_22.c ../../idf_app/main/fonts/material_icons_28.c)
-target_include_directories(halo_native_checks PRIVATE stubs ../../common ../../idf_app/main ${CJSON_SOURCE})
+target_include_directories(halo_native_checks PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/stubs" ../../common ../../idf_app/main ${CJSON_SOURCE})
 if(CJSON_SOURCE)
   target_sources(halo_native_checks PRIVATE ${CJSON_SOURCE}/cJSON.c)
 else()
