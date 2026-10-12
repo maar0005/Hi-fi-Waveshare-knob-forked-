@@ -56,7 +56,21 @@ sub Main()
     m.index = 6
     revealControls()
     onKeyEvent("right", true)
-    check(m.index = 0, "seven-action control overlay wraps after Settings")
+    check(m.index = 3, "secondary control row wraps after Settings")
+    m.controls = false
+    m.library.open = false
+    m.client.request = invalid
+    onKeyEvent("up", true)
+    check(m.library.open and m.client.request = invalid, "Up from artwork opens Library directly without playback")
+    m.library.visible = false
+    m.index = 0
+    revealControls()
+    onKeyEvent("right", true)
+    onKeyEvent("right", true)
+    check(m.index = 2, "held arrow can navigate without waiting for release")
+    m.client.request = invalid
+    sendCommand("vol_up")
+    check(m.client.request = invalid, "disabled room control sends no command from UI")
     if m.failures = 0 then print "PASS all remote tests: "; m.count
 end sub
 

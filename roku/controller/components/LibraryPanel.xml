@@ -11,10 +11,10 @@
   <script type="text/brightscript" uri="pkg:/components/LibraryPanel.brs" />
   <children>
     <Rectangle width="1920" height="1080" color="0x101012FF" />
-    <Label id="libraryTitle" translation="[120,64]" width="1680" height="72" font="font:LargeSystemFont" color="0xEEE8DAFF" />
-    <Label id="libraryCrumbs" translation="[120,148]" width="1680" height="48" font="font:SmallSystemFont" color="0xC0BAB0FF" />
-    <LabelList id="libraryList" translation="[120,230]" itemSize="[1680,74]" numRows="8" itemSpacing="[0,14]" font="font:MediumSystemFont" focusedFont="font:MediumSystemFont" color="0xEEE8DAFF" focusedColor="0x101012FF" focusBitmapBlendColor="0xEEE8DAFF" />
-    <Label id="libraryNotice" translation="[120,952]" width="1680" height="44" font="font:SmallSystemFont" color="0xEEE8DAFF" />
-    <Label id="libraryHint" translation="[120,1010]" width="1680" height="36" text="OK select · Back return · Options library menu" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+    <Label id="libraryTitle" translation="[120,64]" width="1680" height="96" wrap="true" maxLines="2" font="font:LargeSystemFont" color="0xEEE8DAFF" />
+    <Label id="libraryCrumbs" translation="[120,176]" width="1680" height="48" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+    <LabelList id="libraryList" translation="[120,244]" itemSize="[1680,74]" numRows="7" itemSpacing="[0,14]" font="font:MediumSystemFont" focusedFont="font:MediumSystemFont" color="0xEEE8DAFF" focusedColor="0x101012FF" focusBitmapBlendColor="0xEEE8DAFF" />
+    <Label id="libraryNotice" translation="[120,882]" width="1680" height="80" wrap="true" maxLines="2" font="font:SmallSystemFont" color="0xEEE8DAFF" />
+    <Label id="libraryHint" translation="[120,980]" width="1680" height="36" text="OK select · Back return · Options music menu" font="font:SmallSystemFont" color="0xC0BAB0FF" />
   </children>
 </component>

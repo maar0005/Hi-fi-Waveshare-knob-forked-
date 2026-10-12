@@ -10,6 +10,9 @@
   <script type="text/brightscript" uri="pkg:/components/ArtScene.brs" />
   <children>
     <Group id="artLayer" />
+    <Animation id="artFade" duration="0.18" easeFunction="outCubic">
+      <FloatFieldInterpolator id="artFadeTarget" key="[0,1]" keyValue="[0.65,1]" />
+    </Animation>
     <Rectangle id="strip" color="0x101012EE" visible="false" />
     <Label id="metadata" font="font:SmallSystemFont" color="0xE8E8E8FF" />
     <BridgeTask id="network" />

@@ -3,7 +3,7 @@ sub Main()
     m.count = 0
     empty = NewClientState(true)
     ResetClient(empty, "", "")
-    check(empty.notice = "Configure bridge and pinned zone in settings", "unconfigured screensaver names settings recovery")
+    check(empty.notice = "Set up your music bridge and listening room in Settings", "unconfigured screensaver names settings recovery")
     s = NewClientState(false)
     ResetClient(s, "http://bridge:8088", "a")
     s.zones = [{zone_id: "a"}, {zone_id: "b"}]
@@ -266,7 +266,7 @@ sub settingsTests()
     check(LoadSettings("screensaver").zone = "b", "controller settings cannot overwrite screensaver selection")
     status = {bridge: "http://bridge:8088", zone: "roon:a-long-internal-zone-id", notice: "", online: true, zones: [{zone_id: "roon:a-long-internal-zone-id", zone_name: "Front Family Room"}]}
     text = SettingsStatus(status)
-    check(Instr(1, text, "Connected") > 0 and Instr(1, text, "Pinned room: Front Family Room") > 0, "successful pin shows connection and readable room name")
+    check(Instr(1, text, "Connected") > 0 and Instr(1, text, "Room: Front Family Room") > 0, "successful pin shows connection and readable room name")
     check(Instr(1, text, "roon:a-long-internal-zone-id") = 0, "internal ID never crowds out pin confirmation")
     status.zones = []
     check(Instr(1, SettingsStatus(status), "Saved room unavailable") > 0, "missing pin reports recovery without another-room fallback")

@@ -21,7 +21,8 @@ for profile in ['controller', 'screensaver']:
         art = z.read('components/ArtScene.brs').decode()
         assert 'loadDisplayMode = "scaleToFit"' in art, 'Second centered crop would lose subjects'
         assert 'roUrlTransfer' not in art, 'Network transfer on render thread'
-        assert 'Pin listening zone' in z.read('components/SettingsScene.xml').decode()
+        assert 'id="zoneList"' in z.read('components/SettingsScene.xml').decode()
+        assert 'SaveSettings(m.top.profile, m.saved.bridge, m.saved.zone)' in z.read('components/SettingsScene.brs').decode(), 'Room selection must persist exact room identity'
         if profile == 'screensaver':
             assert 'screensaver_title=' in manifest
             assert 'sub Main(' not in entry

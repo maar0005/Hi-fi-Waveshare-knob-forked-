@@ -31,7 +31,7 @@ sub requestLibrary(req as object)
         return
     end if
     if not LibraryReady(m.state, m.clock.TotalMilliseconds(), req.kind = "library_play")
-        libraryResult(req.requestId, "error", "Library unavailable — check connection and pinned room", invalid)
+        libraryResult(req.requestId, "error", "Library unavailable — check connection and listening room", invalid)
         m.nextRead = 0
         return
     end if
@@ -44,7 +44,7 @@ sub requestLibrary(req as object)
             return
         end if
         m.state.pending = true
-        m.state.notice = "Sending library command"
+        m.state.notice = "Asking your room to play…"
         meta = { requestId: req.requestId, operation: "play", action: req.action, generation: m.libraryGeneration }
         startTransfer("libraryCommand", "/api/play_ref", { zone_id: m.state.zone, ref: req.ref, action: req.action }, meta)
         publish()
@@ -52,7 +52,7 @@ sub requestLibrary(req as object)
     end if
     body = LibraryBody(req, LibraryZone(m.state.zones, m.state.zone))
     if body = invalid
-        libraryResult(req.requestId, "error", "This library action is unavailable for the pinned room", invalid)
+        libraryResult(req.requestId, "error", "This library action is unavailable for the listening room", invalid)
         return
     end if
     resetLibrary()
@@ -77,11 +77,11 @@ sub libraryResponse(entry as object, body as object)
             ' All invalid refs require a new deliberate selection; never retry a mutation.
             if TextField(body, "outcome") = "invalid" then status = "refresh"
             m.libraryRows = []
-            m.state.notice = "Library command refused — checking state"
+            m.state.notice = "Playback not accepted — checking your music"
             if meta.generation = m.libraryGeneration then libraryResult(meta.requestId, status, error, invalid)
         else
-            m.state.notice = "Play requested — refreshing"
-            if meta.action = "queue" then m.state.notice = "Queue request accepted — refreshing"
+            m.state.notice = "Waiting for playback…"
+            if meta.action = "queue" then m.state.notice = "Checking your queue…"
             if meta.generation = m.libraryGeneration then libraryResult(meta.requestId, "accepted", m.state.notice, { action: meta.action })
         end if
         publish()
@@ -114,9 +114,9 @@ sub libraryFailed(entry as object)
     if entry.role = "libraryCommand"
         m.state.pending = false
         m.state.uncertain = true
-        m.state.notice = "Command outcome unknown — checking state"
+        m.state.notice = "Checking whether playback changed…"
         invalidatePlaying()
-        notice = "Command outcome unknown. Check playback before trying again."
+        notice = "Still checking playback. Wait before trying again."
         publish()
     end if
     if meta.generation = m.libraryGeneration then libraryResult(meta.requestId, "error", notice, invalid)

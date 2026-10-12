@@ -9,6 +9,7 @@ sub init()
     m.current = invalid
     m.context = invalid
     m.requestId = 0
+    m.dialogSequence = 0
     m.mode = "menu"
     m.busy = false
     m.selected = invalid
@@ -54,7 +55,7 @@ sub libraryMenu()
     m.busy = false
     zone = LibraryZone(m.context.zones, m.context.zone)
     m.title.text = "Library · " + TextField(zone, "zone_name")
-    m.crumbs.text = "Pinned listening room"
+    m.crumbs.text = "Choose something to listen to"
     rows = []
     for each tabName in LibraryTabs(zone)
         labels = { browse: "Browse library", playlists: "Playlists", favorites: "Favorites", radio: "Radio" }
@@ -65,7 +66,7 @@ sub libraryMenu()
         if LibrarySource(m.context.zone) = "musicassistant" then rows.Push({ title: "Current queue", kind: "queue" })
     end if
     rows.Push({ title: "Back to artwork", kind: "close" })
-    if rows.Count() = 1 then m.notice.text = "Library unavailable for this room. Pin a supported room in Options settings."
+    if rows.Count() = 1 then m.notice.text = "This room has no music library. Choose another room in Settings."
     showRows(rows, 0)
 end sub
 
@@ -117,8 +118,8 @@ sub requestPage(page as object)
     zone = LibraryZone(m.context.zones, m.context.zone)
     m.title.text = page.title + " · " + TextField(zone, "zone_name")
     m.crumbs.text = ""
-    m.notice.text = "Loading…"
-    showRows([], 0)
+    m.notice.text = "Finding your music…"
+    showRows([{title: "Back to music", kind: "return"}], 0)
     req = { kind: "library", operation: page.operation, tab: page.tab, location: page.location, offset: page.offset, query: page.query, session: m.context.session, zone: m.context.zone, requestId: m.requestId }
     m.top.client.request = req
 end sub
@@ -155,7 +156,7 @@ sub onLibraryResult()
         m.mode = "error"
         m.selected = invalid
         m.notice.text = result.notice
-        showRows([{title: "Refresh this list", kind: "retry"}, {title: "Library menu", kind: "menu"}], 0)
+        showRows([{title: "Refresh", kind: "retry"}, {title: "Library menu", kind: "menu"}], 0)
         return
     end if
     m.mode = "results"
@@ -173,6 +174,7 @@ sub onLibraryResult()
 end sub
 
 sub restoreResults()
+    m.title.text = m.current.title + " · " + roomName()
     m.mode = "results"
     rows = []
     for each row in m.resultRows
@@ -180,15 +182,26 @@ sub restoreResults()
     end for
     if m.nextOffset <> invalid then rows.Push({ title: "More results", kind: "more" })
     m.notice.text = ""
-    if rows.Count() = 0 then m.notice.text = "No results. Back returns to the previous view."
+    if rows.Count() = 0
+        m.notice.text = "Nothing here yet. Back returns to your music."
+        if m.current.operation = "search"
+            m.notice.text = "No matches. Try another artist, album, or song."
+            rows.Push({ title: "Search again", kind: "search" })
+        end if
+        rows.Push({ title: "Back to music", kind: "return" })
+    end if
     showRows(rows, m.current.focus)
 end sub
 
 sub librarySelected()
-    if m.busy then return
     index = m.list.itemSelected
     if index < 0 or index >= m.rows.Count() then return
     row = m.rows[index]
+    if row.kind = "return"
+        libraryBack()
+        return
+    end if
+    if m.busy then return
     if row.kind = "close"
         leaveLibrary()
     else if row.kind = "menu"
@@ -215,7 +228,7 @@ sub librarySelected()
         else if row.ref <> ""
             itemActions()
         else
-            m.notice.text = "This item has no available playback action."
+            m.notice.text = "This item cannot be played. Choose another."
         end if
     else if row.kind = "restore"
         m.title.text = m.current.title + " · " + TextField(LibraryZone(m.context.zones, m.context.zone), "zone_name")
@@ -224,7 +237,8 @@ sub librarySelected()
         openFolder()
     else if row.kind = "action"
         m.busy = true
-        m.notice.text = "Sending request…"
+        m.notice.text = "Asking " + roomName() + " to play…"
+        if row.action = "queue" then m.notice.text = "Adding to " + roomName() + "’s queue…"
         m.top.client.request = { kind: "library_play", action: row.action, ref: m.selected.ref, zone: m.context.zone, session: m.context.session, requestId: m.requestId }
     end if
 end sub
@@ -234,8 +248,9 @@ sub itemActions()
     m.title.text = m.selected.title
     rows = [{ title: "Back to list", kind: "restore" }]
     if m.selected.location <> "" then rows.Push({ title: "Open", kind: "folder" })
-    rows.Push({ title: "Play in pinned room", kind: "action", action: "play" })
+    rows.Push({ title: "Play", kind: "action", action: "play" })
     rows.Push({ title: "Add to queue", kind: "action", action: "queue" })
+    m.crumbs.text = roomName()
     m.notice.text = ""
     showRows(rows, 0)
 end sub
@@ -253,9 +268,12 @@ sub searchLibrary()
     else
         m.dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
     end if
-    m.dialog.title = "Search the pinned room’s music provider"
+    m.dialogSequence++
+    m.dialog.id = "search-" + m.dialogSequence.ToStr()
+    m.dialog.title = "Search music"
     m.dialog.buttons = ["Search", "Cancel"]
     m.dialog.ObserveField("buttonSelected", "searchChosen")
+    m.dialog.ObserveField("wasClosed", "searchDismissed")
     m.top.GetScene().dialog = m.dialog
 end sub
 
@@ -269,11 +287,12 @@ sub searchChosen()
     accepted = m.dialog.buttonSelected = 0
     query = m.dialog.text.Trim()
     if accepted and (query = "" or Len(query) > 256)
-        m.dialog.title = "Enter 1–256 characters"
+        m.dialog.title = "Type an artist, album, or song"
         return
     end if
-    m.dialog.close = true
+    dialog = m.dialog
     m.dialog = invalid
+    dialog.close = true
     m.list.SetFocus(true)
     if accepted
         m.history = []
@@ -288,7 +307,15 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     if key <> "back" then return false
-    if m.busy and m.mode = "actions" then return true
+    libraryBack()
+    return true
+end function
+
+sub libraryBack()
+    if m.busy and m.mode = "actions"
+        leaveLibrary()
+        return
+    end if
     if m.mode = "actions"
         m.title.text = m.current.title + " · " + TextField(LibraryZone(m.context.zones, m.context.zone), "zone_name")
         restoreResults()
@@ -299,5 +326,15 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else
         libraryMenu()
     end if
-    return true
+end sub
+
+function roomName() as string
+    return TextField(LibraryZone(m.context.zones, m.context.zone), "zone_name")
 end function
+
+sub searchDismissed(event as object)
+    if m.dialog = invalid then return
+    if event.GetRoSGNode().id <> m.dialog.id then return
+    m.dialog = invalid
+    if m.top.visible then m.list.SetFocus(true)
+end sub

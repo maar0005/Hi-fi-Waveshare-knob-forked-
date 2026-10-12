@@ -22,7 +22,7 @@ sub Main()
     check(m.list.focused, "native list gets remote focus")
     m.list.itemSelected = 0
     librarySelected()
-    check(m.busy and m.mode = "loading" and m.rows.Count() = 0, "browse loading cannot activate previous rows")
+    check(m.busy and m.mode = "loading" and m.rows.Count() = 1 and m.rows[0].kind = "return", "browse loading cannot activate previous rows")
     check(m.top.client.request.operation = "browse" and m.top.client.request.zone = "roon:room", "UI request bound to pinned room")
     firstId = m.requestId
     deliver(firstId, "ok", [{title: "Album", subtitle: "Artist", location: "loc-album", ref: "ref-album"}, {title: "Folder", subtitle: "", location: "loc-folder", ref: ""}], 20)
@@ -44,9 +44,9 @@ sub Main()
     stale = firstId
     active = m.requestId
     deliver(stale, "ok", [{title: "Old", ref: "old", location: "", subtitle: ""}], invalid)
-    check(m.busy and m.rows.Count() = 0, "same-zone late UI callback cannot replace newer page")
+    check(m.busy and m.rows.Count() = 1, "same-zone late UI callback cannot replace newer page")
     deliver(active, "ok", [], invalid)
-    check(m.notice.text <> "" and m.rows.Count() = 0, "empty page has recovery copy")
+    check(m.notice.text <> "" and m.rows[0].kind = "return", "empty page has recovery copy")
     onKeyEvent("back", true)
     check(m.current.focus = 1 and m.current.location = "" and m.top.client.request.location = "", "Back re-reads parent descriptor, not expired cached refs")
     deliver(m.requestId, "ok", [{title: "Album", subtitle: "Artist", location: "loc-album", ref: "fresh"}, {title: "Folder", subtitle: "", location: "loc-folder", ref: ""}], 20)
@@ -65,6 +65,7 @@ sub Main()
     m.list.itemFocused = 0
     librarySelected()
     check(m.rows.Count() = 3 and m.rows[1].action = "play", "track chooser has deliberate Play/Add actions")
+    check(m.rows[1].title = "Play" and m.crumbs.text = "Listening room", "plain Play action retains human room destination")
     m.list.itemSelected = 1
     librarySelected()
     check(m.busy and m.top.client.request.kind = "library_play" and m.top.client.request.ref = "fresh-track", "Play dispatches opaque item ref")
@@ -116,6 +117,35 @@ sub Main()
     priorId = m.requestId
     searchChosen()
     check(m.requestId = priorId, "closed old-room keyboard cannot trigger new-room search")
+    m.top.snapshot = {session: 5, zone: "roon:room", zones: [{zone_id: "roon:room", zone_name: "Listening room", browse_supported: true, library_tabs: ["browse"]}]}
+    libraryContext()
+    m.top.open = true
+    openLibrary()
+    searchLibrary()
+    m.list.focused = false
+    searchDismissed({node: m.dialog, GetRoSGNode: function() as object
+        return m.node
+    end function})
+    check(m.dialog = invalid and m.list.focused, "keyboard Back dismissal restores list focus without submitting")
+    requestPage(libraryPage("search", "Search: missing", "browse", "", 0, "missing"))
+    deliver(m.requestId, "ok", [], invalid)
+    check(m.rows[0].kind = "search" and m.rows[1].kind = "return", "empty search offers another search and return")
+    requestPage(libraryPage("browse", "Albums"))
+    deliver(m.requestId, "ok", [{title: "Track", subtitle: "Artist", ref: "queue-ref", location: ""}], invalid)
+    m.list.itemSelected = 0
+    librarySelected()
+    m.list.itemSelected = 2
+    librarySelected()
+    m.top.client.libraryResult = {requestId: m.requestId, session: m.context.session, zone: m.context.zone, status: "accepted", notice: "Checking your queue…", data: {action: "queue"}}
+    onLibraryResult()
+    check(m.title.text = "Albums · Listening room" and m.notice.text = "Checking your queue…", "accepted queue restores list heading and keeps acknowledgement")
+    m.list.itemSelected = 0
+    librarySelected()
+    m.list.itemSelected = 1
+    librarySelected()
+    request = m.top.client.request
+    onKeyEvent("back", true)
+    check(not m.top.visible and m.top.client.request.kind = "library_close", "Back during pending Play returns to artwork without sending another mutation")
     if m.failures = 0 then print "PASS all library UI tests: "; m.count
 end sub
 

@@ -35,11 +35,12 @@ end sub
 
 sub bridgeDialog()
     dialog = CreateObject("roSGNode", "StandardKeyboardDialog")
-    dialog.title = "UHC bridge address"
+    dialog.title = "Music bridge address"
     dialog.message = ["Enter a host or IP address. Default port: 8088."]
     dialog.text = m.saved.bridge
     dialog.buttons = ["Connect", "Cancel"]
     dialog.ObserveField("buttonSelected", "bridgeChosen")
+    dialog.ObserveField("wasClosed", "bridgeDismissed")
     m.top.dialog = dialog
 end sub
 
@@ -73,9 +74,11 @@ sub zoneDialog()
         end if
     end for
     if m.zoneOptions.Count() = 0
-        m.top.FindNode("status").text = "No zones available. Check the bridge address and connection."
+        m.top.FindNode("status").text = "No rooms found. Check the music bridge address."
         return
     end if
+    m.top.FindNode("status").visible = false
+    m.top.FindNode("heading").text = "Choose your listening room"
     m.zoneList.content = content
     m.zoneList.visible = true
     m.choices.visible = false
@@ -93,6 +96,8 @@ sub zoneChosen()
 end sub
 
 sub closeZones()
+    m.top.FindNode("status").visible = true
+    m.top.FindNode("heading").text = "Listening room"
     m.zoneList.visible = false
     m.choices.visible = true
     m.choices.SetFocus(true)
@@ -109,3 +114,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub bridgeDismissed()
+    m.choices.SetFocus(true)
+end sub

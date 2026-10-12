@@ -16,6 +16,7 @@ function RunController() as boolean
     scene.settings = LoadSettings("controller")
     scene.ObserveField("openSettings", port)
     screen.Show()
+    scene.SetFocus(true)
     settingsRequested = false
     while true
         msg = Wait(0, port)

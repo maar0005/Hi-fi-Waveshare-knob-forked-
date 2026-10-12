@@ -49,7 +49,7 @@ sub runBridge()
         end if
         if m.state.online and now - m.state.freshAt > 45000
             m.state.online = false
-            m.state.notice = "Connection stale — reconnecting"
+            m.state.notice = "Reconnecting to your music…"
             publish()
         end if
     end while
@@ -166,8 +166,8 @@ sub handleResponse(msg as object)
         if not HasZone(body.zones, m.state.zone)
             m.state.playing = invalid
             m.state.online = false
-            m.state.notice = "Saved zone unavailable — repin in settings"
-            if m.state.zone = "" then m.state.notice = "Pin a listening zone in settings"
+            m.state.notice = "Room unavailable — choose another in Settings"
+            if m.state.zone = "" then m.state.notice = "Choose a listening room in Settings"
         end if
         m.nextRead = 0
     else if entry.role = "playing"
@@ -198,11 +198,11 @@ sub failed(entry as object)
     if entry.role = "command"
         m.state.pending = false
         m.state.uncertain = true
-        m.state.notice = "Command outcome unknown — checking state"
+        m.state.notice = "Checking whether playback changed…"
         invalidatePlaying()
     else
         m.state.online = false
-        m.state.notice = "Bridge unavailable — reconnecting"
+        m.state.notice = "Music bridge offline — reconnecting"
         m.failures++
         delay = RetryDelay(m.failures)
         m.nextRead = m.clock.TotalMilliseconds() + delay

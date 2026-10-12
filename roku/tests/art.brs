@@ -25,6 +25,14 @@ sub Main()
     check(m.metadata.visible and m.metadata.text <> "", "failed artwork has a truthful error notice")
     clearArt()
     check(m.shown = invalid and m.layer.removed = 3, "clear on missing or changed zone releases displayed image")
+    m.shown = {artIdentity: "old"}
+    m.artFade = {control: "stop", state: "running"}
+    m.loading = {artGeneration: 4, artIdentity: m.artKey, visible: false, loadStatus: "ready"}
+    old = m.shown
+    artLoaded(artEvent(m.loading))
+    check(m.retiring.artIdentity = "old" and m.artFade.control = "start" and m.shown.visible, "same-room ready art fades over previous cover without blanking")
+    clearArt()
+    check(m.retiring = invalid and m.shown = invalid and m.artFade.control = "stop", "room clear interrupts transition and releases both covers immediately")
     if m.failures = 0 then print "PASS all artwork tests: "; m.count
 end sub
 

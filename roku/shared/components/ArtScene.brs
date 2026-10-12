@@ -17,14 +17,18 @@ sub artInit(readonly as boolean)
     m.artGeneration = 0
     m.shown = invalid
     m.loading = invalid
+    m.retiring = invalid
+    m.artFade = m.top.FindNode("artFade")
+    m.artFadeTarget = m.top.FindNode("artFadeTarget")
+    m.artFade.ObserveField("state", "finishArtFade")
     ' Explicit FHD design space; Roku scales the scene for HD displays.
     m.viewport = ArtViewport(1920, 1080, readonly)
     m.strip.translation = [0, m.viewport.height]
     m.strip.width = 1920
     m.strip.height = 36
     m.strip.visible = not readonly
-    m.metadata.translation = [30, m.viewport.height + 3]
-    m.metadata.width = 1860
+    m.metadata.translation = [96, m.viewport.height + 3]
+    m.metadata.width = 1728
     m.metadata.height = 30
     if readonly then m.metadata.translation = [30, 1020]
 end sub
@@ -45,7 +49,12 @@ sub onSnapshot()
     text = m.snapshot.notice
     p = m.snapshot.playing
     if text = "" and p <> invalid and not m.readonly
-        text = TextField(p, "line1") + "  ·  " + TextField(p, "line2")
+        text = TextField(p, "line1")
+        artist = TextField(p, "line2")
+        if artist <> ""
+            if text <> "" then text += "  ·  "
+            text += artist
+        end if
     end if
     m.metadata.text = text
     m.metadata.visible = text <> ""
@@ -60,6 +69,7 @@ sub onSnapshot()
 end sub
 
 sub clearArt()
+    settleArt()
     if m.loading <> invalid then m.layer.RemoveChild(m.loading)
     if m.shown <> invalid then m.layer.RemoveChild(m.shown)
     m.loading = invalid
@@ -68,6 +78,7 @@ sub clearArt()
 end sub
 
 sub loadArt(state as object)
+    settleArt()
     if m.loading <> invalid then m.layer.RemoveChild(m.loading)
     ' Never leave artwork from another room behind while its replacement loads.
     if m.shown <> invalid
@@ -98,19 +109,46 @@ sub artLoaded(event as object)
     if node.artGeneration <> m.loading.artGeneration then return
     if node.artIdentity <> m.artKey then return
     if node.loadStatus = "ready"
-        if m.shown <> invalid then m.layer.RemoveChild(m.shown)
+        settleArt()
+        old = m.shown
         node.visible = true
+        node.id = "currentArt"
         m.shown = node
         m.loading = invalid
+        if old <> invalid and m.artFade <> invalid
+            old.id = "outgoingArt"
+            m.retiring = old
+            if m.artFadeTarget <> invalid
+                m.artFadeTarget.fieldToInterp = ""
+                m.artFadeTarget.fieldToInterp = "currentArt.opacity"
+            end if
+            m.artFade.control = "start"
+        else if old <> invalid
+            m.layer.RemoveChild(old)
+        end if
     else if node.loadStatus = "failed"
         m.layer.RemoveChild(node)
         m.loading = invalid
         m.artKey = ""
-        m.metadata.text = "Artwork unavailable — retrying"
+        m.metadata.text = "Cover unavailable — trying again"
         m.metadata.visible = true
     end if
 end sub
 
 sub updateController()
     ' Read-only base scene has no controller chrome.
+end sub
+
+sub settleArt()
+    if m.retiring <> invalid then m.layer.RemoveChild(m.retiring)
+    m.retiring = invalid
+    if m.artFade <> invalid then m.artFade.control = "stop"
+    if m.shown <> invalid then m.shown.opacity = 1
+end sub
+
+sub finishArtFade()
+    if m.artFade.state <> "stopped" then return
+    if m.retiring <> invalid then m.layer.RemoveChild(m.retiring)
+    m.retiring = invalid
+    if m.shown <> invalid then m.shown.opacity = 1
 end sub

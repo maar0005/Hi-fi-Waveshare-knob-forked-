@@ -19,6 +19,11 @@ sub RunHiPhi(sceneName as string, profile as string)
     scene.settings = LoadSettings(profile)
     scene.ObserveField("done", port)
     screen.Show()
+    if sceneName = "SettingsScene"
+        if scene.dialog = invalid then scene.FindNode("choices").SetFocus(true)
+    else
+        scene.SetFocus(true)
+    end if
     while true
         msg = Wait(0, port)
         if type(msg) = "roSGScreenEvent"
@@ -58,5 +63,5 @@ function SettingsStatus(state as dynamic) as string
             end for
         end if
     end if
-    return TextField(state, "bridge") + Chr(10) + connection + Chr(10) + "Pinned room: " + room
+    return TextField(state, "bridge") + Chr(10) + connection + Chr(10) + "Room: " + room
 end function
