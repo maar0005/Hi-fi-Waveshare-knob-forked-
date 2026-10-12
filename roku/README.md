@@ -1,6 +1,6 @@
 # HiPhi for Roku
 
-Two developer packages share the same UHC client and artwork renderer: **HiPhi Controller** is an artwork-first foreground controller; **HiPhi Artwork** is a standalone screensaver with full-screen art. This directory lives alongside firmware but changes no ESP build or UHC API. Both packages are experimental and require exact-artifact Roku testing before readiness or unattended-display claims.
+Two developer packages share the same UHC client and artwork renderer: **HiPhi Control** is an artwork-first foreground controller; **HiPhi Artwork** is a standalone screensaver with full-screen art. This directory lives alongside firmware but changes no ESP build or UHC API. Both packages are experimental and require exact-artifact Roku testing before readiness or unattended-display claims.
 
 ## Build
 
