@@ -20,7 +20,13 @@ sub RunHiPhi(sceneName as string, profile as string)
     scene.ObserveField("done", port)
     screen.Show()
     if sceneName = "SettingsScene"
-        if scene.dialog = invalid then scene.FindNode("choices").SetFocus(true)
+        if scene.dialog = invalid
+            if scene.FindNode("zoneList").visible
+                scene.FindNode("zoneList").SetFocus(true)
+            else
+                scene.FindNode("choices").SetFocus(true)
+            end if
+        end if
     else
         scene.SetFocus(true)
     end if

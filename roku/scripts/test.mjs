@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
 for (const files of [
+  ['shared/components/SettingsScene.brs', 'shared/source/Settings.brs', 'shared/source/Model.brs', 'tests/discovery_ui.brs'],
+  ['shared/source/Model.brs', 'shared/source/Discovery.brs', 'tests/discovery.brs'],
   ['shared/source/Model.brs', 'shared/source/Settings.brs', 'shared/source/LibraryModel.brs', 'shared/components/BridgeLibrary.brs', 'shared/components/BridgeTask.brs', 'tests/client.brs'],
   ['shared/source/Model.brs', 'shared/source/LibraryModel.brs', 'shared/components/BridgeLibrary.brs', 'shared/components/BridgeTask.brs', 'tests/library.brs'],
   ['shared/source/Model.brs', 'shared/source/LibraryModel.brs', 'controller/components/LibraryPanel.brs', 'tests/library_ui.brs'],
