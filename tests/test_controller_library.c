@@ -32,6 +32,21 @@ int main(void) {
       !controller_library_parse("{\"scope\":{\"zone_id\":\"roon:z\"},"
                                 "\"outcome\":\"ok\",\"data\":{\"items\":[{}]}}",
                                 "roon:z", false, page));
+  cJSON *long_root = cJSON_Parse(valid);
+  cJSON *long_row = cJSON_GetArrayItem(
+      cJSON_GetObjectItemCaseSensitive(
+          cJSON_GetObjectItemCaseSensitive(long_root, "data"), "items"),
+      0);
+  char long_title[310];
+  memset(long_title, 'a', 299);
+  memcpy(long_title + 299, "\xf0\x9f\x8e\xb5", 5);
+  cJSON_ReplaceItemInObjectCaseSensitive(long_row, "title",
+                                         cJSON_CreateString(long_title));
+  char *long_json = cJSON_PrintUnformatted(long_root);
+  assert(controller_library_parse(long_json, "roon:z", false, page));
+  assert(strlen(page->items[0].title) == 299);
+  cJSON_free(long_json);
+  cJSON_Delete(long_root);
   cJSON *r = cJSON_Parse(valid);
   cJSON *items = cJSON_GetObjectItemCaseSensitive(
       cJSON_GetObjectItemCaseSensitive(r, "data"), "items");

@@ -47,12 +47,12 @@ static struct {
   int offset, selected_index;
 } history[HISTORY_MAX];
 static int depth, setting_index;
-static lv_obj_t *overlay, *heading, *cover, *title, *subtitle, *counter, *back,
-    *primary, *secondary;
+static lv_obj_t *overlay, *heading, *cover_placeholder, *cover, *title,
+    *subtitle, *counter, *back, *primary, *secondary;
 static lv_image_dsc_t cover_dsc;
 static char *cover_pixels;
 static bool chooser;
-static int64_t mutation_sent_ms;
+static int64_t mutation_sent_ms, last_settings_refresh_ms;
 static void render(void);
 static bool submit(int kind, const char *ref, const char *image);
 static void reset_library(void) {
@@ -141,9 +141,18 @@ static void clear_cover(void) {
     lv_obj_add_flag(cover, LV_OBJ_FLAG_HIDDEN);
   if (cover)
     lv_image_set_src(cover, NULL);
+  if (cover_pixels)
+    lv_image_cache_drop(&cover_dsc);
   platform_http_free(cover_pixels);
   cover_pixels = NULL;
   memset(&cover_dsc, 0, sizeof(cover_dsc));
+  if (cover_placeholder) {
+    if (screen == LIBRARY && page && page->count &&
+        !(busy && busy_kind == BROWSE))
+      lv_obj_remove_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
+  }
 }
 static void label(lv_obj_t **out, lv_obj_t *parent, int y, int width,
                   const lv_font_t *font) {
@@ -346,6 +355,11 @@ static void ensure_overlay(void) {
   lv_obj_set_style_pad_all(overlay, 0, 0);
   lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
   label(&heading, overlay, 24, 220, font_manager_get_small());
+  label(&cover_placeholder, overlay, 126, 144, font_manager_get_small());
+  lv_label_set_text(cover_placeholder, "Collection");
+  lv_obj_set_style_text_color(cover_placeholder, lv_color_hex(0x777777), 0);
+  lv_obj_add_flag(cover_placeholder, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(cover_placeholder, tap, LV_EVENT_CLICKED, (void *)3);
   cover = lv_image_create(overlay);
   lv_obj_align(cover, LV_ALIGN_TOP_MID, 0, 69);
   lv_obj_add_flag(cover, LV_OBJ_FLAG_CLICKABLE);
@@ -414,6 +428,17 @@ static void render(void) {
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 226);
   lv_obj_align(subtitle, LV_ALIGN_TOP_MID, 0, 261);
   lv_label_set_text(heading, chooser ? "Choose action" : "Library");
+  if (cover_placeholder) {
+    lv_label_set_text(cover_placeholder,
+                      page && page->count &&
+                              *page->items[selected_index].location
+                          ? "Collection"
+                          : "No cover");
+    if (!cover_pixels && page && page->count && !(busy && busy_kind == BROWSE))
+      lv_obj_remove_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
+    else
+      lv_obj_add_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
+  }
   if (busy && busy_kind != IMAGE) {
     lv_label_set_text(title, "Loading...");
     lv_label_set_text(subtitle, "");
@@ -529,6 +554,7 @@ void halo_navigation_process(void) {
           cover_dsc.data = (uint8_t *)cover_pixels;
           lv_image_set_src(cover, &cover_dsc);
           lv_obj_remove_flag(cover, LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
         }
       } else if (result->request.kind == BROWSE) {
         *page = result->page;
@@ -576,6 +602,11 @@ void halo_navigation_process(void) {
     if (controller_connection_ready(&c) &&
         c.last_success_ms > (uint64_t)mutation_sent_ms)
       mutation_locked = false;
+  }
+  if (screen == SETTINGS && setting_index == 1 &&
+      esp_timer_get_time() / 1000 - last_settings_refresh_ms > 1000) {
+    last_settings_refresh_ms = esp_timer_get_time() / 1000;
+    render();
   }
   if (screen == ZONES && !ui_is_zone_picker_visible())
     change_screen(NOW_PLAYING);

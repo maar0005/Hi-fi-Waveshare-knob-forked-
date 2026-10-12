@@ -13,6 +13,16 @@ static bool copy(char *to, size_t n, const char *from) {
   memcpy(to, from, strlen(from) + 1);
   return true;
 }
+static void copy_label(char *to, size_t n, const char *from) {
+  size_t length = strlen(from);
+  if (length >= n) {
+    length = n - 1;
+    while (length && (((unsigned char)from[length] & 0xc0) == 0x80))
+      length--;
+  }
+  memcpy(to, from, length);
+  to[length] = 0;
+}
 bool controller_library_image_path(const char *path) {
   const char *prefix = "/api/collections/image?ref=";
   if (strncmp(path, prefix, strlen(prefix)))
@@ -66,11 +76,11 @@ bool controller_library_parse(const char *json, const char *zone, bool mutation,
   cJSON_ArrayForEach(item, items) {
     controller_library_item_t *r = &out->items[out->count];
     if (!*str(item, "title") ||
-        !copy(r->title, sizeof(r->title), str(item, "title")) ||
-        !copy(r->subtitle, sizeof(r->subtitle), str(item, "subtitle")) ||
         !copy(r->location, sizeof(r->location), str(item, "location")) ||
         !copy(r->ref, sizeof(r->ref), str(item, "ref")))
       goto done;
+    copy_label(r->title, sizeof(r->title), str(item, "title"));
+    copy_label(r->subtitle, sizeof(r->subtitle), str(item, "subtitle"));
     const char *image = str(item, "image");
     if (controller_library_image_path(image))
       copy(r->image, sizeof(r->image), image);
