@@ -4,6 +4,9 @@ sub init()
     m.crumbs = m.top.FindNode("libraryCrumbs")
     m.notice = m.top.FindNode("libraryNotice")
     m.list.ObserveField("itemSelected", "librarySelected")
+    m.list.ObserveField("itemFocused", "previewFocused")
+    m.preview = m.top.FindNode("previewArt")
+    m.preview.ObserveField("loadStatus", "previewLoaded")
     m.history = []
     m.rows = []
     m.current = invalid
@@ -83,6 +86,8 @@ sub leaveLibrary()
     end if
     if m.current <> invalid and m.mode = "results" then m.current.focus = m.list.itemFocused
     cancelLibrary()
+    m.preview.uri = ""
+    m.preview.visible = false
     m.top.visible = false
     m.busy = false
     m.top.done = true
@@ -97,15 +102,15 @@ sub showRows(rows as object, focus as integer)
     end if
     for each row in rows
         item = content.CreateChild("ContentNode")
-        text = TextField(row, "title")
-        subtitle = TextField(row, "subtitle")
-        if subtitle <> "" then text += " · " + subtitle
-        item.title = text
+        item.title = TextField(row, "title")
+        item.description = TextField(row, "subtitle")
+        item.HDPosterUrl = LibraryImageURL(TextField(m.context, "bridge"), TextField(row, "image"))
     end for
     m.list.content = content
     if focus < 0 then focus = 0
     if focus >= rows.Count() then focus = rows.Count() - 1
     if focus >= 0 then m.list.jumpToItem = focus
+    updatePreview(focus)
     m.list.SetFocus(true)
 end sub
 
@@ -178,7 +183,7 @@ sub restoreResults()
     m.mode = "results"
     rows = []
     for each row in m.resultRows
-        rows.Push({ title: row.title, subtitle: row.subtitle, location: row.location, ref: row.ref, kind: "item" })
+        rows.Push({ title: row.title, subtitle: row.subtitle, location: row.location, ref: row.ref, image: TextField(row, "image"), kind: "item" })
     end for
     if m.nextOffset <> invalid then rows.Push({ title: "More results", kind: "more" })
     m.notice.text = ""
@@ -337,4 +342,33 @@ sub searchDismissed(event as object)
     if event.GetRoSGNode().id <> m.dialog.id then return
     m.dialog = invalid
     if m.top.visible then m.list.SetFocus(true)
+end sub
+
+sub previewFocused()
+    updatePreview(m.list.itemFocused)
+end sub
+
+sub updatePreview(index as integer)
+    m.preview.visible = false
+    m.preview.uri = ""
+    m.top.FindNode("previewTitle").text = ""
+    m.top.FindNode("previewSubtitle").text = ""
+    m.top.FindNode("previewFallback").visible = false
+    if index < 0 or index >= m.rows.Count() then return
+    row = m.rows[index]
+    if m.mode = "actions" and m.selected <> invalid then row = m.selected
+    if TextField(row, "kind") <> "item" then return
+    m.top.FindNode("previewTitle").text = TextField(row, "title")
+    m.top.FindNode("previewSubtitle").text = TextField(row, "subtitle")
+    image = LibraryImageURL(TextField(m.context, "bridge"), TextField(row, "image"))
+    m.top.FindNode("previewFallback").visible = true
+    m.top.FindNode("previewFallback").text = "No cover available"
+    if image <> "" then m.top.FindNode("previewFallback").text = "Loading cover…"
+    m.preview.uri = image
+end sub
+
+sub previewLoaded()
+    m.preview.visible = m.preview.uri <> "" and m.preview.loadStatus = "ready"
+    if m.preview.visible then m.top.FindNode("previewFallback").visible = false
+    if m.preview.loadStatus = "failed" then m.top.FindNode("previewFallback").text = "Cover unavailable"
 end sub

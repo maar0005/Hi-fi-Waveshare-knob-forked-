@@ -106,7 +106,7 @@ function LibraryRows(body as object, operation as string) as dynamic
         title = TextField(item, "title")
         if operation = "queue" then title = TextField(item, "name")
         if title = "" then return invalid
-        row = { title: Left(title, 300), subtitle: Left(TextField(item, "subtitle"), 300), location: TextField(item, "location"), ref: TextField(item, "ref") }
+        row = { title: Left(title, 300), subtitle: Left(TextField(item, "subtitle"), 300), location: TextField(item, "location"), ref: TextField(item, "ref"), image: TextField(item, "image") }
         if operation = "queue"
             row.location = ""
             row.ref = ""
@@ -132,4 +132,15 @@ function LibraryNextOffset(data as dynamic, current as integer) as dynamic
     if not IsNumericValue(value) then return invalid
     if value <= current or value > 1000000 then return invalid
     return Int(value)
+end function
+
+function LibraryImageURL(bridge as string, image as string) as string
+    prefix = "/api/collections/image?ref="
+    if Left(image, Len(prefix)) <> prefix then return ""
+    token = Mid(image, Len(prefix) + 1)
+    if token = "" or Len(token) > 512 then return ""
+    if not CreateObject("roRegex", "^[A-Za-z0-9%._~-]+$", "").IsMatch(token) then return ""
+    root = NormalizeBridge(bridge)
+    if root = "" then return ""
+    return root + image
 end function

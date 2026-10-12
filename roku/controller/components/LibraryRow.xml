@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LibraryRow" extends="Group">
+  <interface>
+    <field id="itemContent" type="node" onChange="rowContent" />
+    <field id="itemHasFocus" type="boolean" onChange="rowFocus" />
+    <field id="listHasFocus" type="boolean" onChange="rowFocus" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/LibraryRow.brs" />
+  <children>
+    <Rectangle id="rowFocusPlate" width="960" height="88" color="0xEEE8DAFF" visible="false" />
+    <Rectangle translation="[10,8]" width="72" height="72" color="0x29292DFF" />
+    <Poster id="rowArt" translation="[10,8]" width="72" height="72" loadWidth="72" loadHeight="72" loadDisplayMode="scaleToFit" />
+    <Label id="rowTitle" translation="[104,10]" width="832" height="40" font="font:MediumSystemFont" color="0xEEE8DAFF" />
+    <Label id="rowSubtitle" translation="[104,52]" width="832" height="30" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+  </children>
+</component>

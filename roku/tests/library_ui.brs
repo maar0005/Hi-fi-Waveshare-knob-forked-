@@ -146,6 +146,18 @@ sub Main()
     request = m.top.client.request
     onKeyEvent("back", true)
     check(not m.top.visible and m.top.client.request.kind = "library_close", "Back during pending Play returns to artwork without sending another mutation")
+    m.context.bridge = "http://bridge:8088"
+    m.mode = "results"
+    showRows([{kind: "item", title: "Album", subtitle: "Artist", image: "/api/collections/image?ref=cover-a"}, {kind: "item", title: "No art", subtitle: "", image: ""}], 0)
+    check(m.list.content.children[0].HDPosterUrl = "http://bridge:8088/api/collections/image?ref=cover-a", "thumbnail uses same-origin UHC image URL")
+    check(m.preview.uri = "http://bridge:8088/api/collections/image?ref=cover-a" and m.top.nodes.previewTitle.text = "Album", "selected row drives large cover and title")
+    m.preview.loadStatus = "ready"
+    previewLoaded()
+    check(m.preview.visible and not m.top.nodes.previewFallback.visible, "preview only displays ready cover")
+    updatePreview(1)
+    check(m.preview.uri = "" and not m.preview.visible and m.top.nodes.previewFallback.text = "No cover available", "artless selection clears previous cover immediately")
+    check(LibraryImageURL("http://bridge:8088", "https://other/cover") = "", "foreign artwork URL is rejected")
+    check(LibraryImageURL("http://bridge:8088", "/api/collections/image?ref=x&other=y") = "", "extra query parameters cannot escape artwork contract")
     if m.failures = 0 then print "PASS all library UI tests: "; m.count
 end sub
 
@@ -158,7 +170,7 @@ end sub
 
 function fakeTop() as object
     nodes = {}
-    for each id in ["libraryList", "libraryTitle", "libraryCrumbs", "libraryNotice"]
+    for each id in ["libraryList", "libraryTitle", "libraryCrumbs", "libraryNotice", "previewArt", "previewTitle", "previewSubtitle", "previewFallback"]
         nodes[id] = {visible: false, text: "", itemFocused: 0, itemSelected: 0, ObserveField: sub(field as string, callback as string)
             end sub, SetFocus: sub(focused as boolean)
                 m.focused = focused

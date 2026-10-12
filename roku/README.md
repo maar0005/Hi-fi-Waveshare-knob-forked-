@@ -75,3 +75,5 @@ Sources: [developer setup](https://developer.roku.com/dev/docs/developer-setup),
 Library contract, risk-retirement evidence and exact-artifact test procedure: [LIBRARY.md](LIBRARY.md).
 
 The interface uses the room’s readable name beside playback choices. Back remains available while loading or waiting for a command; leaving does not resend or undo it. Keyboard dismissal restores native list focus. Same-room cover changes use a short interruptible native crossfade; changing rooms removes the old cover immediately. Controls fade in once when revealed and never delay input. These refinements require exact-artifact native verification, particularly keyboard Back, held keys and animation interruption.
+
+Library rows display 72-pixel square album thumbnails and separate title/artist lines. The focused item gets a 580-pixel fitted cover preview with its title and artist. UHC supplies optional same-origin `/api/collections/image?ref=…` artwork URLs; missing or failed art has a quiet fallback and never reuses the previous selection’s cover. The resting now-playing screen and screensaver stay artwork-first.
