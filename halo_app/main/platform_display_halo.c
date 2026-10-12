@@ -8,6 +8,7 @@
 #include "bridge_client.h"
 #include "ui.h"
 #include "halo_navigation.h"
+#include "controller_navigation.h"
 #include "halo_st77916_init.h"
 
 #include <inttypes.h>
@@ -68,10 +69,6 @@ static const char *TAG = "display";
 #define BL_MAX_DUTY ((1 << 7) - 1)
 
 /* Gesture thresholds (same semantics as the Dial). */
-#define SWIPE_MIN_DISTANCE 60
-#define SWIPE_MAX_TIME_MS 500
-#define DOUBLE_TAP_MAX_MS 400
-#define DOUBLE_TAP_MAX_DISTANCE 40
 
 static lv_display_t *s_display;
 static lv_indev_t *s_touch_indev;
@@ -182,13 +179,14 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     s_tracking = false;
     int dx = s_last_x - s_start_x, dy = s_last_y - s_start_y;
     int64_t elapsed = esp_timer_get_time() / 1000 - s_start_ms;
-    int raw_dx = dx, raw_dy = dy;
-    if (s_rotation == 180) { dx = -dx; dy = -dy; }
-    if (elapsed < SWIPE_MAX_TIME_MS && (abs(dx) >= SWIPE_MIN_DISTANCE || abs(dy) >= SWIPE_MIN_DISTANCE)) {
-        s_pending_dx = dx; s_pending_dy = dy;
-    } else if (abs(raw_dx) < DOUBLE_TAP_MAX_DISTANCE && abs(raw_dy) < DOUBLE_TAP_MAX_DISTANCE) {
-        data->point.x = s_last_x; data->point.y = s_last_y;
-        data->state = LV_INDEV_STATE_PRESSED; s_tap_release = true;
+    controller_touch_t gesture=controller_navigation_touch(dx,dy,elapsed,s_rotation);
+    if(gesture==CONTROLLER_TOUCH_UP||gesture==CONTROLLER_TOUCH_DOWN) {
+        s_pending_dx=0;s_pending_dy=gesture==CONTROLLER_TOUCH_UP?-60:60;
+    }else if(gesture==CONTROLLER_TOUCH_LEFT||gesture==CONTROLLER_TOUCH_RIGHT){
+        s_pending_dx=gesture==CONTROLLER_TOUCH_LEFT?-60:60;s_pending_dy=0;
+    }else if(gesture==CONTROLLER_TOUCH_TAP){
+        data->point.x=s_last_x;data->point.y=s_last_y;
+        data->state=LV_INDEV_STATE_PRESSED;s_tap_release=true;
     }
 }
 void platform_display_process_pending(void) {

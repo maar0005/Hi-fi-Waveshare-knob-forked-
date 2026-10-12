@@ -4,6 +4,7 @@ set(SRC_FILES
     "halo_ui_stubs.c"
     "halo_navigation.c"
     "../../common/controller_library.c"
+    "../../common/controller_navigation.c"
     "../../idf_app/main/controller_input_profile_dial.c"
     "../../idf_app/main/font_manager.c"
     "../../idf_app/main/fonts/lato_22.c"

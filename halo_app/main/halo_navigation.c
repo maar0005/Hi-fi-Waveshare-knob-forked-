@@ -4,9 +4,12 @@
 #include "cJSON.h"
 #include "controller_config.h"
 #include "controller_library.h"
+#include "controller_navigation.h"
 #include "font_manager.h"
 #include "lvgl.h"
 #include "platform_display_halo.h"
+#include "src/misc/cache/instance/lv_image_cache.h"
+#include "src/misc/cache/instance/lv_image_header_cache.h"
 #include "ui.h"
 #include "wifi_manager.h"
 #include <esp_heap_caps.h>
@@ -19,7 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { ARTWORK, NOW_PLAYING, LIBRARY, ZONES, SETTINGS, SCREEN_COUNT };
 enum { BROWSE, PLAY, QUEUE, IMAGE };
 #define HISTORY_MAX 8
 #define COVER_SIZE 144
@@ -39,7 +41,8 @@ static QueueHandle_t requests, results;
 static bool busy, mutation_locked;
 static int busy_kind;
 static unsigned generation = 1;
-static int screen = NOW_PLAYING, selected_index, offset, brightness = 100;
+static int screen = CONTROLLER_SCREEN_NOW_PLAYING, selected_index, offset,
+           brightness = 100;
 static controller_library_page_t *page;
 static char endpoint[128], zone[64], location[513];
 static struct {
@@ -141,13 +144,15 @@ static void clear_cover(void) {
     lv_obj_add_flag(cover, LV_OBJ_FLAG_HIDDEN);
   if (cover)
     lv_image_set_src(cover, NULL);
-  if (cover_pixels)
+  if (cover_pixels) {
     lv_image_cache_drop(&cover_dsc);
+    lv_image_header_cache_drop(&cover_dsc);
+  }
   platform_http_free(cover_pixels);
   cover_pixels = NULL;
   memset(&cover_dsc, 0, sizeof(cover_dsc));
   if (cover_placeholder) {
-    if (screen == LIBRARY && page && page->count &&
+    if (screen == CONTROLLER_SCREEN_LIBRARY && page && page->count &&
         !(busy && busy_kind == BROWSE))
       lv_obj_remove_flag(cover_placeholder, LV_OBJ_FLAG_HIDDEN);
     else
@@ -174,16 +179,17 @@ static void change_screen(int next) {
   chooser = false;
   generation++;
   ui_hide_zone_picker();
-  ui_set_controls_visible(screen == NOW_PLAYING);
+  ui_set_controls_visible(screen == CONTROLLER_SCREEN_NOW_PLAYING);
   if (overlay)
     lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
   clear_cover();
-  if (screen == LIBRARY || screen == SETTINGS) {
+  if (screen == CONTROLLER_SCREEN_LIBRARY ||
+      screen == CONTROLLER_SCREEN_SETTINGS) {
     render();
-    if (screen == LIBRARY && !busy)
+    if (screen == CONTROLLER_SCREEN_LIBRARY && !busy)
       submit(BROWSE, NULL, NULL);
   }
-  if (screen == ZONES) {
+  if (screen == CONTROLLER_SCREEN_ZONES) {
     bridge_zone_t zones[BRIDGE_CLIENT_MAX_ZONES];
     const char *names[BRIDGE_CLIENT_MAX_ZONES], *ids[BRIDGE_CLIENT_MAX_ZONES];
     int n = bridge_client_get_zones(zones, BRIDGE_CLIENT_MAX_ZONES),
@@ -199,7 +205,7 @@ static void change_screen(int next) {
     if (n > 0)
       ui_show_zone_picker(names, ids, n, selected);
     else {
-      screen = SETTINGS;
+      screen = CONTROLLER_SCREEN_SETTINGS;
       render();
       lv_label_set_text(subtitle, "No zones. Check connection.");
     }
@@ -207,8 +213,9 @@ static void change_screen(int next) {
 }
 static void selected_cover(void) {
   clear_cover();
-  if (screen == LIBRARY && !chooser && page && selected_index < page->count &&
-      *page->items[selected_index].image && !busy)
+  if (screen == CONTROLLER_SCREEN_LIBRARY && !chooser && page &&
+      selected_index < page->count && *page->items[selected_index].image &&
+      !busy)
     submit(IMAGE, NULL, page->items[selected_index].image);
 }
 static void move_item(int delta) {
@@ -254,7 +261,7 @@ static void back_action(void) {
     selected_index = history[depth].selected_index;
     submit(BROWSE, NULL, NULL);
   } else
-    change_screen(NOW_PLAYING);
+    change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
 }
 static void open_item(void) {
   if (busy || !page || selected_index >= page->count)
@@ -282,9 +289,9 @@ static void tap(lv_event_t *event) {
   if (lv_event_get_code(event) != LV_EVENT_CLICKED)
     return;
   int action = (int)(intptr_t)lv_event_get_user_data(event);
-  if (screen == SETTINGS) {
+  if (screen == CONTROLLER_SCREEN_SETTINGS) {
     if (action == 0)
-      change_screen(NOW_PLAYING);
+      change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
     if (action == 1 || action == 3) {
       if (setting_index == 0) {
         brightness = brightness == 100 ? 70 : brightness == 70 ? 40 : 100;
@@ -381,7 +388,7 @@ static void render(void) {
   button_text(back, "Back");
   lv_obj_remove_flag(primary, LV_OBJ_FLAG_HIDDEN);
   lv_obj_remove_flag(secondary, LV_OBJ_FLAG_HIDDEN);
-  if (screen == SETTINGS) {
+  if (screen == CONTROLLER_SCREEN_SETTINGS) {
     clear_cover();
     lv_obj_set_width(primary, 128);
     lv_obj_align(primary, LV_ALIGN_TOP_MID, 0, 238);
@@ -530,7 +537,7 @@ void halo_navigation_process(void) {
     snprintf(zone, sizeof(zone), "%s", selected);
     reset_library();
     clear_cover();
-    if (screen == LIBRARY && !busy) {
+    if (screen == CONTROLLER_SCREEN_LIBRARY && !busy) {
       render();
       submit(BROWSE, NULL, NULL);
     }
@@ -541,7 +548,7 @@ void halo_navigation_process(void) {
     if (result && result->request.generation == generation &&
         request_current(&result->request)) {
       if (result->request.kind == IMAGE) {
-        if (result->ok && screen == LIBRARY) {
+        if (result->ok && screen == CONTROLLER_SCREEN_LIBRARY) {
           clear_cover();
           cover_pixels = result->pixels;
           result->pixels = NULL;
@@ -567,7 +574,7 @@ void halo_navigation_process(void) {
         bridge_client_request_poll();
         if (result->ok) {
           reset_library();
-          change_screen(NOW_PLAYING);
+          change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
         } else {
           page->count = 0;
           snprintf(page->notice, sizeof(page->notice), "%s",
@@ -575,7 +582,7 @@ void halo_navigation_process(void) {
           render();
         }
       }
-    } else if (screen == LIBRARY) {
+    } else if (screen == CONTROLLER_SCREEN_LIBRARY) {
       if (!result) {
         page->count = 0;
         snprintf(page->notice, sizeof(page->notice),
@@ -603,30 +610,31 @@ void halo_navigation_process(void) {
         c.last_success_ms > (uint64_t)mutation_sent_ms)
       mutation_locked = false;
   }
-  if (screen == SETTINGS && setting_index == 1 &&
+  if (screen == CONTROLLER_SCREEN_SETTINGS && setting_index == 1 &&
       esp_timer_get_time() / 1000 - last_settings_refresh_ms > 1000) {
     last_settings_refresh_ms = esp_timer_get_time() / 1000;
     render();
   }
-  if (screen == ZONES && !ui_is_zone_picker_visible())
-    change_screen(NOW_PLAYING);
+  if (screen == CONTROLLER_SCREEN_ZONES && !ui_is_zone_picker_visible())
+    change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
 }
 void halo_navigation_swipe(int dx, int dy) {
   if (abs(dy) > abs(dx))
-    change_screen((screen + (dy < 0 ? 1 : SCREEN_COUNT - 1)) % SCREEN_COUNT);
-  else if (screen == LIBRARY)
+    change_screen((screen + (dy < 0 ? 1 : CONTROLLER_SCREEN_COUNT - 1)) %
+                  CONTROLLER_SCREEN_COUNT);
+  else if (screen == CONTROLLER_SCREEN_LIBRARY)
     move_item(dx < 0 ? 1 : -1);
 }
 bool halo_navigation_encoder(int delta) {
-  if (screen == ZONES) {
+  if (screen == CONTROLLER_SCREEN_ZONES) {
     ui_zone_picker_scroll(delta > 0 ? 1 : -1);
     return true;
   }
-  if (screen == LIBRARY) {
+  if (screen == CONTROLLER_SCREEN_LIBRARY) {
     move_item(delta);
     return true;
   }
-  if (screen == SETTINGS) {
+  if (screen == CONTROLLER_SCREEN_SETTINGS) {
     setting_index += delta > 0 ? 1 : -1;
     if (setting_index < 0)
       setting_index = 0;
@@ -635,12 +643,16 @@ bool halo_navigation_encoder(int delta) {
     render();
     return true;
   }
-  return false;
+  return !controller_navigation_encoder_uses_volume(screen);
 }
-void halo_navigation_settings(void) { change_screen(SETTINGS); }
-bool halo_navigation_settings_visible(void) { return screen == SETTINGS; }
+void halo_navigation_settings(void) {
+  change_screen(CONTROLLER_SCREEN_SETTINGS);
+}
+bool halo_navigation_settings_visible(void) {
+  return screen == CONTROLLER_SCREEN_SETTINGS;
+}
 
 void halo_navigation_close_settings(void) {
-  if (screen == SETTINGS)
-    change_screen(NOW_PLAYING);
+  if (screen == CONTROLLER_SCREEN_SETTINGS)
+    change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
 }
