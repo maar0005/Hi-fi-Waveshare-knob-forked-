@@ -100,6 +100,11 @@ void ui_hide_zone_picker(void) {}
 bool ui_is_zone_picker_visible(void) { return false; }
 void ui_zone_picker_scroll(int delta) { (void)delta; }
 static bool artwork_only;
+static void (*background_tap_handler)(void);
+static int reset_calls;
+void ui_set_background_tap_handler(void (*handler)(void)) { background_tap_handler = handler; }
+void wifi_mgr_forget_wifi(void) { reset_calls++; }
+const char *portal_brand_firmware_version(void) { return "test-version"; }
 void ui_set_controls_visible(bool visible) { (void)visible; }
 void ui_set_artwork_only(bool only) { artwork_only = only; }
 int platform_http_get_bounded(const char *url, size_t maximum, char **out,
@@ -200,12 +205,34 @@ int main(int argc, char **argv) {
   assert(screen == CONTROLLER_SCREEN_NOW_PLAYING);
   assert(!artwork_only);
   assert(!lv_obj_has_flag(home_button, LV_OBJ_FLAG_HIDDEN));
+  assert(background_tap_handler);
+  background_tap_handler();
+  assert(screen == CONTROLLER_SCREEN_ARTWORK && artwork_only);
+  assert(!background_tap_handler);
   change_screen(CONTROLLER_SCREEN_MENU);
   advance(100);
   snapshot(dir, "menu");
   change_screen(CONTROLLER_SCREEN_SETTINGS);
   advance(300);
   snapshot(dir, "settings");
+  lv_obj_scroll_to_view(rows[4], LV_ANIM_OFF);
+  advance(100);
+  click(rows[4]);
+  assert(settings_about && !settings_reset);
+  click(back);
+  assert(!settings_about && screen == CONTROLLER_SCREEN_SETTINGS);
+  lv_obj_scroll_to_view(rows[5], LV_ANIM_OFF);
+  advance(100);
+  click(rows[5]);
+  assert(settings_reset && reset_calls == 0);
+  click(back);
+  assert(!settings_reset && reset_calls == 0);
+  lv_obj_scroll_to_view(rows[5], LV_ANIM_OFF);
+  advance(100);
+  click(rows[5]);
+  click(primary);
+  assert(reset_calls == 1);
+  change_screen(CONTROLLER_SCREEN_SETTINGS);
   /* Slow finger remains a real press. Drag scrolls Settings, never changes page
    * or activates the brightness row underneath the finger. */
   input(180, 145, true, 650);

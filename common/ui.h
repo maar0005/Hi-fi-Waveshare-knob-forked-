@@ -40,6 +40,7 @@ void ui_trigger_update(void);  // Called when user taps update notification
 
 // Display state control
 void ui_set_controls_visible(bool visible);  // Show/hide UI controls for art mode
+void ui_set_background_tap_handler(void (*handler)(void));
 void ui_set_artwork_only(bool artwork_only);  // Hide the entire chrome layer, including arcs
 
 // Network status banner (persistent, doesn't auto-clear)

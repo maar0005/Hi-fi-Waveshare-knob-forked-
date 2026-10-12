@@ -8,6 +8,7 @@
 #include "font_manager.h"
 #include "lvgl.h"
 #include "platform_display_halo.h"
+#include "portal_brand.h"
 #include "src/misc/cache/instance/lv_image_cache.h"
 #include "src/misc/cache/instance/lv_image_header_cache.h"
 #include "ui.h"
@@ -70,6 +71,8 @@ static struct {
   bool attempted, failed;
 } covers[CONTROLLER_LIBRARY_PAGE_SIZE];
 static bool chooser;
+static bool settings_about, settings_reset;
+static void return_to_artwork(void);
 static int pending_mutation = -1;
 static unsigned pending_mutation_generation;
 static char pending_ref[513];
@@ -190,6 +193,9 @@ static void button_text(lv_obj_t *button, const char *text) {
 }
 static void change_screen(int next) {
   screen = next;
+  settings_about = settings_reset = false;
+  ui_set_background_tap_handler(screen == CONTROLLER_SCREEN_NOW_PLAYING
+                                    ? return_to_artwork : NULL);
   pending_mutation = -1;
   desired_absolute = -1;
   chooser = false;
@@ -360,10 +366,20 @@ enum {
   ACTION_CONTROLS,
   ACTION_NEXT,
   ACTION_PREVIOUS,
+  ACTION_RESET_CONFIRM,
   ACTION_ROW = 100
 };
+static void return_to_artwork(void) {
+  if (screen == CONTROLLER_SCREEN_NOW_PLAYING)
+    change_screen(CONTROLLER_SCREEN_ARTWORK);
+}
 static void tap(lv_event_t *event) {
   int action = (int)(intptr_t)lv_event_get_user_data(event);
+  if (action == ACTION_RESET_CONFIRM && screen == CONTROLLER_SCREEN_SETTINGS && settings_reset) {
+    settings_reset = false;
+    wifi_mgr_forget_wifi();
+    return;
+  }
   if (action == ACTION_MENU) {
     menu_index = 0;
     change_screen(CONTROLLER_SCREEN_MENU);
@@ -389,11 +405,15 @@ static void tap(lv_event_t *event) {
     return;
   }
   if (action == ACTION_CONTROLS) {
-    menu_index = 3;
     change_screen(CONTROLLER_SCREEN_NOW_PLAYING);
     return;
   }
   if (action == ACTION_BACK) {
+    if (screen == CONTROLLER_SCREEN_SETTINGS && (settings_about || settings_reset)) {
+      settings_about = settings_reset = false;
+      render();
+      return;
+    }
     if (screen == CONTROLLER_SCREEN_LIBRARY)
       back_action();
     else
@@ -422,6 +442,10 @@ static void tap(lv_event_t *event) {
       if (rows[1])
         lv_label_set_text(lv_obj_get_child(rows[1], 1), "Checking…");
       bridge_client_request_poll();
+    } else if (setting_index == 4 || setting_index == 5) {
+      settings_about = setting_index == 4;
+      settings_reset = setting_index == 5;
+      render();
     } else {
       char ip[32] = "";
       wifi_mgr_get_ip(ip, sizeof(ip));
@@ -673,7 +697,7 @@ static void render(void) {
         snprintf(name, sizeof(name), "Zone: %s", zs[i].name);
     list_row(name, NULL, ACTION_ZONES, 1);
     list_row("Settings", NULL, ACTION_SETTINGS, 2);
-    list_row("Playback controls", NULL, ACTION_CONTROLS, 3);
+
     focus_row(menu_index);
   } else if (screen == CONTROLLER_SCREEN_ZONES) {
     lv_label_set_text(heading, "Pick a zone");
@@ -684,6 +708,25 @@ static void render(void) {
     focus_row(zone_index);
   } else if (screen == CONTROLLER_SCREEN_SETTINGS) {
     lv_label_set_text(heading, "Settings");
+    if (settings_about || settings_reset) {
+      lv_obj_add_flag(scroller, LV_OBJ_FLAG_HIDDEN);
+      lv_label_set_text(heading, settings_about ? "About" : "Factory reset?");
+      lv_obj_t *text;
+      label(&text, overlay, 112, 252, font_manager_get_small());
+      lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
+      if (settings_about) {
+        char ip[32] = "";
+        wifi_mgr_get_ip(ip, sizeof(ip));
+        lv_label_set_text_fmt(text, "HiPhi HALO\nFirmware %s\n%s\nhiphi.audio", portal_brand_firmware_version(), ip);
+      } else {
+        lv_label_set_text(text, "Erase Wi-Fi and all saved settings?\nHALO will restart in setup mode.");
+        primary = button(overlay, 0, 278, 152, ACTION_RESET_CONFIRM);
+        button_text(primary, "Reset device");
+      }
+      lv_label_set_text(subtitle, "");
+      rebuilding = false;
+      return;
+    }
     char detail[160];
     snprintf(detail, sizeof(detail), "%d%%", brightness);
     lv_obj_t *brightness_row = list_row("Brightness", detail, ACTION_ROW, 0);
@@ -708,6 +751,8 @@ static void render(void) {
     char base[128] = "";
     bridge_client_get_bridge_url(base, sizeof(base));
     list_row("Music bridge", base, ACTION_ROW + 3, 3);
+    list_row("About", "Device and firmware", ACTION_ROW + 4, 4);
+    list_row("Factory reset", "Erase saved settings", ACTION_ROW + 5, 5);
     lv_label_set_text(subtitle, "Tap connection to refresh");
     focus_row(setting_index);
   } else {
@@ -1028,8 +1073,8 @@ bool halo_navigation_encoder(int delta) {
     menu_index += delta;
     if (menu_index < 0)
       menu_index = 0;
-    if (menu_index > 3)
-      menu_index = 3;
+    if (menu_index > 2)
+      menu_index = 2;
     focus_row(menu_index);
     return true;
   }
@@ -1054,11 +1099,12 @@ bool halo_navigation_encoder(int delta) {
     return true;
   }
   if (screen == CONTROLLER_SCREEN_SETTINGS) {
+    if (settings_about || settings_reset) return true;
     setting_index += delta;
     if (setting_index < 0)
       setting_index = 0;
-    if (setting_index > 3)
-      setting_index = 3;
+    if (setting_index > 5)
+      setting_index = 5;
     focus_row(setting_index);
     return true;
   }

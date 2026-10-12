@@ -94,6 +94,11 @@ static lv_obj_t *s_setup_logo;         // HiPhi mark, shown only on the Wi-Fi se
 // Artwork layers
 static lv_obj_t *s_artwork_container;  // Container for artwork layers
 static lv_obj_t *s_artwork_image;      // Album art image
+static void (*s_background_tap_handler)(void);
+static void background_tap_cb(lv_event_t *event) {
+    (void)event;
+    if (s_background_tap_handler) s_background_tap_handler();
+}
 static lv_obj_t *s_ui_container;       // Container for all UI widgets
 static lv_anim_t s_marquee_anim;
 static bool s_marquee_anim_ready = false;
@@ -358,6 +363,7 @@ static void build_layout(void) {
 
     // Create UI container directly (no intermediate overlay layer)
     s_ui_container = lv_obj_create(s_artwork_container);
+    lv_obj_add_event_cb(s_ui_container, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(s_ui_container, SCREEN_SIZE, SCREEN_SIZE);
     lv_obj_center(s_ui_container);
     lv_obj_set_style_bg_opa(s_ui_container, LV_OPA_TRANSP, 0);
@@ -484,6 +490,7 @@ static void build_layout(void) {
     // Now Playing group - volume, artist, track, controls (flex column, centered)
     // ========================================================================
     lv_obj_t *now_playing = lv_obj_create(s_ui_container);
+    lv_obj_add_event_cb(now_playing, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(now_playing, SCREEN_SIZE - 80, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(now_playing, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(now_playing, 0, 0);
@@ -525,6 +532,7 @@ static void build_layout(void) {
 
     // Controls row - flex row for transport buttons
     lv_obj_t *controls = lv_obj_create(now_playing);
+    lv_obj_add_event_cb(controls, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(controls, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(controls, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(controls, 0, 0);
@@ -623,6 +631,10 @@ static bool s_zone_long_pressed = false;  // Prevent click after long press
 
 static void zone_label_event_cb(lv_event_t *e) {
     (void)e;
+    if (s_background_tap_handler) {
+        s_background_tap_handler();
+        return;
+    }
     // Skip click if it came from a long press release
     if (s_zone_long_pressed) {
         s_zone_long_pressed = false;
@@ -635,6 +647,7 @@ static void zone_label_event_cb(lv_event_t *e) {
 
 static void zone_label_long_press_cb(lv_event_t *e) {
     (void)e;
+    if (s_background_tap_handler) return;
     s_zone_long_pressed = true;  // Mark that we handled a long press
     controller_action_t action = controller_action_simple(
         CONTROLLER_ACTION_SHOW_SETTINGS);
@@ -1660,6 +1673,10 @@ void ui_trigger_update(void) {
 // ============================================================================
 // Display State Control - Art Mode
 // ============================================================================
+
+void ui_set_background_tap_handler(void (*handler)(void)) {
+    s_background_tap_handler = handler;
+}
 
 void ui_set_artwork_only(bool artwork_only) {
     /* Hide the parent so poll updates, battery timers and optimistic volume
