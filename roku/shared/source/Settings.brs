@@ -53,15 +53,15 @@ function SettingsStatus(state as dynamic) as string
     room = "Not selected"
     zoneId = TextField(state, "zone")
     if zoneId <> ""
-        room = "Saved room unavailable"
+        room = "Selected zone unavailable"
         if type(state.zones) = "roArray"
             for each zone in state.zones
                 if TextField(zone, "zone_id") = zoneId
                     room = TextField(zone, "zone_name")
-                    if room = "" then room = "Selected room"
+                    if room = "" then room = "Selected zone"
                 end if
             end for
         end if
     end if
-    return TextField(state, "bridge") + Chr(10) + connection + Chr(10) + "Room: " + room
+    return TextField(state, "bridge") + Chr(10) + connection + Chr(10) + "Zone: " + room
 end function

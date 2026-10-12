@@ -20,6 +20,6 @@
     <Label id="previewTitle" translation="[1180,844]" width="580" height="76" wrap="true" maxLines="2" font="font:MediumSystemFont" color="0xEEE8DAFF" />
     <Label id="previewSubtitle" translation="[1180,924]" width="580" height="48" font="font:SmallSystemFont" color="0xC0BAB0FF" />
     <Label id="libraryNotice" translation="[120,882]" width="960" height="80" wrap="true" maxLines="2" font="font:SmallSystemFont" color="0xEEE8DAFF" />
-    <Label id="libraryHint" translation="[120,980]" width="1680" height="36" text="OK select · Back return · Options music menu" font="font:SmallSystemFont" color="0xC0BAB0FF" />
+    <Label id="libraryHint" translation="[120,980]" width="1680" height="36" text="OK: select · Back: return · Options: library menu" font="font:SmallSystemFont" color="0xC0BAB0FF" />
   </children>
 </component>

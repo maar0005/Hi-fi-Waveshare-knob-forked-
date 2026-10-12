@@ -130,7 +130,7 @@ sub artLoaded(event as object)
         m.layer.RemoveChild(node)
         m.loading = invalid
         m.artKey = ""
-        m.metadata.text = "Cover unavailable — trying again"
+        m.metadata.text = "Cover unavailable — retrying…"
         m.metadata.visible = true
     end if
 end sub

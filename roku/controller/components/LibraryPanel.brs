@@ -69,7 +69,7 @@ sub libraryMenu()
         if LibrarySource(m.context.zone) = "musicassistant" then rows.Push({ title: "Current queue", kind: "queue" })
     end if
     rows.Push({ title: "Back to artwork", kind: "close" })
-    if rows.Count() = 1 then m.notice.text = "This room has no music library. Choose another room in Settings."
+    if rows.Count() = 1 then m.notice.text = "No library for this zone. Pick another zone in Settings."
     showRows(rows, 0)
 end sub
 
@@ -188,7 +188,7 @@ sub restoreResults()
     if m.nextOffset <> invalid then rows.Push({ title: "More results", kind: "more" })
     m.notice.text = ""
     if rows.Count() = 0
-        m.notice.text = "Nothing here yet. Back returns to your music."
+        m.notice.text = "Nothing here yet. Press Back to return."
         if m.current.operation = "search"
             m.notice.text = "No matches. Try another artist, album, or song."
             rows.Push({ title: "Search again", kind: "search" })
@@ -233,7 +233,7 @@ sub librarySelected()
         else if row.ref <> ""
             itemActions()
         else
-            m.notice.text = "This item cannot be played. Choose another."
+            m.notice.text = "Cannot play this item. Choose another."
         end if
     else if row.kind = "restore"
         m.title.text = m.current.title + " · " + TextField(LibraryZone(m.context.zones, m.context.zone), "zone_name")
@@ -242,7 +242,7 @@ sub librarySelected()
         openFolder()
     else if row.kind = "action"
         m.busy = true
-        m.notice.text = "Asking " + roomName() + " to play…"
+        m.notice.text = "Starting playback in " + roomName() + "…"
         if row.action = "queue" then m.notice.text = "Adding to " + roomName() + "’s queue…"
         m.top.client.request = { kind: "library_play", action: row.action, ref: m.selected.ref, zone: m.context.zone, session: m.context.session, requestId: m.requestId }
     end if

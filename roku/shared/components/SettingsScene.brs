@@ -49,7 +49,7 @@ sub bridgeChosen()
     if dialog.buttonSelected = 0
         bridge = NormalizeBridge(dialog.text)
         if bridge = ""
-            dialog.title = "Enter a host or IP, optionally :port"
+            dialog.title = "Check the bridge address"
             return
         end if
         if bridge <> m.saved.bridge then m.saved.zone = ""
@@ -74,11 +74,11 @@ sub zoneDialog()
         end if
     end for
     if m.zoneOptions.Count() = 0
-        m.top.FindNode("status").text = "No rooms found. Check the music bridge address."
+        m.top.FindNode("status").text = "No zones found. Check your music bridge address."
         return
     end if
     m.top.FindNode("status").visible = false
-    m.top.FindNode("heading").text = "Choose your listening room"
+    m.top.FindNode("heading").text = "Pick a zone"
     m.zoneList.content = content
     m.zoneList.visible = true
     m.choices.visible = false
@@ -97,7 +97,7 @@ end sub
 
 sub closeZones()
     m.top.FindNode("status").visible = true
-    m.top.FindNode("heading").text = "Listening room"
+    m.top.FindNode("heading").text = "Settings"
     m.zoneList.visible = false
     m.choices.visible = true
     m.choices.SetFocus(true)

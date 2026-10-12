@@ -44,7 +44,7 @@ sub requestLibrary(req as object)
             return
         end if
         m.state.pending = true
-        m.state.notice = "Asking your room to play…"
+        m.state.notice = "Starting playback…"
         meta = { requestId: req.requestId, operation: "play", action: req.action, generation: m.libraryGeneration }
         startTransfer("libraryCommand", "/api/play_ref", { zone_id: m.state.zone, ref: req.ref, action: req.action }, meta)
         publish()

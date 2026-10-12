@@ -40,7 +40,7 @@ function HasZone(zones as dynamic, zone as string) as boolean
 end function
 
 function NewClientState(readonly as boolean) as object
-    return { readonly: readonly, session: 0, bridge: "", zone: "", zones: [], playing: invalid, online: false, pending: false, uncertain: false, freshAt: -100000, notice: "Choose your music bridge and listening room" }
+    return { readonly: readonly, session: 0, bridge: "", zone: "", zones: [], playing: invalid, online: false, pending: false, uncertain: false, freshAt: -100000, notice: "Connect to your music bridge and pick a zone" }
 end function
 
 sub ResetClient(state as object, bridge as string, zone as string)
@@ -54,8 +54,8 @@ sub ResetClient(state as object, bridge as string, zone as string)
     state.uncertain = false
     state.freshAt = -100000
     state.notice = "Connecting"
-    if zone = "" then state.notice = "Choose a listening room in Settings"
-    if bridge = "" then state.notice = "Set up your music bridge and listening room in Settings"
+    if zone = "" then state.notice = "Pick a zone in Settings"
+    if bridge = "" then state.notice = "Connect to your music bridge in Settings"
 end sub
 
 function AcceptPlaying(state as object, session as integer, zone as string, body as dynamic, now as integer) as boolean

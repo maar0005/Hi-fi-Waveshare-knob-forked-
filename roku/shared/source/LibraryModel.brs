@@ -83,7 +83,7 @@ end function
 
 function LibraryEnvelopeError(body as dynamic, zone as string) as string
     if type(body) <> "roAssociativeArray" then return "Invalid library response — try again"
-    if TextField(body.scope, "zone_id") <> zone then return "Library response belongs to another room — refresh"
+    if TextField(body.scope, "zone_id") <> zone then return "Zone changed. Refresh the library."
     outcome = TextField(body, "outcome")
     if outcome = "ok" or outcome = "accepted" then return ""
     detail = TextField(body.refusal, "detail")

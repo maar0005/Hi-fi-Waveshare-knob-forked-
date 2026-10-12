@@ -55,9 +55,9 @@ sub updateController()
         if i = m.index then label.color = "0x101012FF"
     end for
     m.top.FindNode("focusPlate").translation = positions[m.index]
-    m.top.FindNode("controlHint").text = "Arrows choose · OK select · Back artwork · Options settings"
+    m.top.FindNode("controlHint").text = "Arrows: choose · OK: select · Back: artwork · Options: settings"
     if m.index < 5 and m.snapshot <> invalid
-        if not m.snapshot.allowed[m.actions[m.index]] then m.top.FindNode("controlHint").text = "Unavailable for this room right now · Back artwork · Options settings"
+        if not m.snapshot.allowed[m.actions[m.index]] then m.top.FindNode("controlHint").text = "Unavailable for this zone · Back: artwork · Options: settings"
     end if
 
 end sub

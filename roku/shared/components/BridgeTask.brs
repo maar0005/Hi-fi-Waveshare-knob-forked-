@@ -137,7 +137,7 @@ sub handleResponse(msg as object)
         m.state.pending = false
         ' HTTP acceptance is not proof of the resulting playback state.
         m.state.uncertain = true
-        m.state.notice = "Refreshing after command"
+        m.state.notice = "Updating playback…"
         invalidatePlaying()
         publish()
         return
@@ -166,8 +166,8 @@ sub handleResponse(msg as object)
         if not HasZone(body.zones, m.state.zone)
             m.state.playing = invalid
             m.state.online = false
-            m.state.notice = "Room unavailable — choose another in Settings"
-            if m.state.zone = "" then m.state.notice = "Choose a listening room in Settings"
+            m.state.notice = "Zone unavailable — pick another in Settings"
+            if m.state.zone = "" then m.state.notice = "Pick a zone in Settings"
         end if
         m.nextRead = 0
     else if entry.role = "playing"
@@ -244,13 +244,13 @@ sub handleRequest(req as dynamic)
     else if req.kind = "command"
         if req.session <> m.state.session or req.zone <> m.state.zone then return
         if not AllowsCommand(m.state, TextField(req, "action"), m.clock.TotalMilliseconds())
-            m.state.notice = "Control unavailable — refreshing state"
+            m.state.notice = "Control unavailable — updating playback…"
             m.nextRead = 0
             publish()
             return
         end if
         m.state.pending = true
-        m.state.notice = "Sending command"
+        m.state.notice = "Updating playback…"
         startTransfer("command", "/control", { zone_id: m.state.zone, action: req.action })
         publish()
     else if req.kind = "refresh"
