@@ -1661,6 +1661,15 @@ void ui_trigger_update(void) {
 // Display State Control - Art Mode
 // ============================================================================
 
+void ui_set_artwork_only(bool artwork_only) {
+    /* Hide the parent so poll updates, battery timers and optimistic volume
+     * feedback cannot reveal individual controls over artwork. Other targets
+     * retain their existing presentation unless they opt into this mode. */
+    if (!s_ui_container) return;
+    if (artwork_only) lv_obj_add_flag(s_ui_container, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(s_ui_container, LV_OBJ_FLAG_HIDDEN);
+}
+
 void ui_set_controls_visible(bool visible) {
     if (visible) {
         // Show all controls

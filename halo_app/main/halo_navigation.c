@@ -196,6 +196,7 @@ static void change_screen(int next) {
   generation++;
   ui_hide_zone_picker();
   ui_set_controls_visible(screen == CONTROLLER_SCREEN_NOW_PLAYING);
+  ui_set_artwork_only(screen == CONTROLLER_SCREEN_ARTWORK);
   if (overlay)
     lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
   if (home_button)
@@ -624,12 +625,13 @@ static void render(void) {
     if (screen == CONTROLLER_SCREEN_ARTWORK) {
       lv_obj_remove_flag(art_touch, LV_OBJ_FLAG_HIDDEN);
       lv_obj_move_foreground(art_touch);
-    } else
+      lv_obj_add_flag(home_button, LV_OBJ_FLAG_HIDDEN);
+    } else {
       lv_obj_add_flag(art_touch, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(home_button, LV_ALIGN_TOP_MID, 0,
-                 screen == CONTROLLER_SCREEN_ARTWORK ? 294 : 34);
-    lv_obj_remove_flag(home_button, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(home_button);
+      lv_obj_align(home_button, LV_ALIGN_TOP_MID, 0, 34);
+      lv_obj_remove_flag(home_button, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_move_foreground(home_button);
+    }
     rebuilding = false;
     return;
   }
@@ -864,6 +866,7 @@ void halo_navigation_process(void) {
       return;
     page->next_offset = -1;
     ui_set_controls_visible(false);
+    ui_set_artwork_only(true);
     render();
     requests = xQueueCreate(1, sizeof(request_t));
     results = xQueueCreate(1, sizeof(result_t *));

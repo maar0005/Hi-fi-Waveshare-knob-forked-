@@ -99,7 +99,9 @@ void platform_display_set_brightness(int percent) { (void)percent; }
 void ui_hide_zone_picker(void) {}
 bool ui_is_zone_picker_visible(void) { return false; }
 void ui_zone_picker_scroll(int delta) { (void)delta; }
+static bool artwork_only;
 void ui_set_controls_visible(bool visible) { (void)visible; }
+void ui_set_artwork_only(bool only) { artwork_only = only; }
 int platform_http_get_bounded(const char *url, size_t maximum, char **out,
                               size_t *len) {
   (void)url;
@@ -189,6 +191,15 @@ int main(int argc, char **argv) {
   results = xQueueCreate(1, sizeof(result_t *));
   bridge_client_get_request_base(endpoint, sizeof(endpoint));
   bridge_client_get_current_zone_id(zone, sizeof(zone));
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
+  advance(100);
+  assert(artwork_only);
+  assert(lv_obj_has_flag(home_button, LV_OBJ_FLAG_HIDDEN));
+  assert(!lv_obj_has_flag(art_touch, LV_OBJ_FLAG_HIDDEN));
+  click(art_touch);
+  assert(screen == CONTROLLER_SCREEN_NOW_PLAYING);
+  assert(!artwork_only);
+  assert(!lv_obj_has_flag(home_button, LV_OBJ_FLAG_HIDDEN));
   change_screen(CONTROLLER_SCREEN_MENU);
   advance(100);
   snapshot(dir, "menu");

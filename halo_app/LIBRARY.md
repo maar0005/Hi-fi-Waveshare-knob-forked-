@@ -2,7 +2,7 @@
 
 Issue #277 and draft PR #278 target HALO TOUCH V2, MAC `80:b5:4e:f9:e1:a8`, on the v2.8 integration branch. The existing display initialization, encoder pin map and settings persistence remain the baseline. Other targets do not compile the HALO navigation renderer.
 
-Artwork is home. Tap artwork for playback controls, or use Menu to choose Library, the listening zone or Settings. Home returns to artwork. Back returns to the parent collection or menu. Sources, folders, Zones and Settings scroll vertically with touch. Pages containing mostly cover images use a horizontal, center-snapping album carousel with adjacent cards visible. Open enters a collection; Play sends playback directly; Queue adds it to the queue. A playable leaf selected from a list opens explicit Play/Queue actions. Folder Back preserves page and selection; page boundaries have visible Previous/More controls.
+Artwork is home. Tap artwork to reveal playback controls and Menu; use Menu to choose Library, the listening zone or Settings. Home returns to artwork. Back returns to the parent collection or menu. Sources, folders, Zones and Settings scroll vertically with touch. Pages containing mostly cover images use a horizontal, center-snapping album carousel with adjacent cards visible. Open enters a collection; Play sends playback directly; Queue adds it to the queue. A playable leaf selected from a list opens explicit Play/Queue actions. Folder Back preserves page and selection; page boundaries have visible Previous/More controls.
 
 The knob controls volume only on Artwork and Now playing. On all other surfaces it moves through rows, album cards or action choices, preserving accumulated detents. Touch scrolling updates the browsing focus so switching to the knob continues from the visible content. There is no global swipe-to-change-screen gesture. Pointer down, movement and release go directly to LVGL, providing normal pressed feedback, drag scrolling, inertia, click cancellation and carousel snapping. LVGL handles display rotation once. Deliberate slow taps have no custom time cutoff.
 
@@ -18,7 +18,7 @@ OWN-WORLD: inherit HiPhi's dark artwork-led display, Lato/Noto Sans bitmap fonts
 
 STORY: see the music, open Menu, pick a collection or zone, then deliberately play. Return to artwork at any point.
 
-FIRST VIEWPORT: full artwork with one Menu control; tap artwork to reveal existing playback controls. Task screens have a heading, Back/Home, scrollable content and explicit actions within the round display.
+FIRST VIEWPORT: full artwork without buttons, text or rings; tap artwork to reveal playback controls and Menu. Task screens have a heading, Back/Home, scrollable content and explicit actions within the round display.
 
 FORM: native LVGL lists for hierarchy and settings; horizontal cover carousel for artwork-rich collections. The existing firmware's visual system stays intact.
 

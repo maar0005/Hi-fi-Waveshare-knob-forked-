@@ -2,7 +2,7 @@
 
 The native surface inherits HiPhi's existing dark artwork-led UI, production Lato 22px/Noto Sans 28px fonts and playback controls. This pass replaces navigation behavior, not the HiPhi brand.
 
-Artwork is the home view. A visible Menu opens named destinations; tapping artwork reveals playback controls. Back navigates the collection hierarchy or returns to Menu. Home consistently returns to artwork. Zones are actions rather than peer pages in a swipe loop.
+Artwork is the home view. Artwork has no buttons, labels or rings. Tapping artwork reveals playback controls and Menu, which opens named destinations. Back navigates the collection hierarchy or returns to Menu. Home consistently returns to artwork. Zones are actions rather than peer pages in a swipe loop.
 
 Task views use the round display's central rectangle: heading at the top, Back/Home below it, scrollable content in the middle, and explicit playback actions above the lower rim. Lists scroll vertically. Artwork-rich collections use a horizontal center-snapping carousel with neighbouring cards visible. Album covers are 132×132 RGB565. Single-row truncation protects long labels; folder/selection state survives Back.
 
