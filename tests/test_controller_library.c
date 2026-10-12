@@ -32,6 +32,11 @@ int main(void) {
       !controller_library_parse("{\"scope\":{\"zone_id\":\"roon:z\"},"
                                 "\"outcome\":\"ok\",\"data\":{\"items\":[{}]}}",
                                 "roon:z", false, page));
+  assert(controller_library_parse(
+      "{\"scope\":{\"zone_id\":\"roon:z\"},\"outcome\":\"ok\",\"data\":{\"items\":["
+      "{\"title\":\"Input\",\"requires_input\":true},{\"title\":\"Prompt\",\"input_prompt\":{}},"
+      "{\"title\":\"Ordinary\"}]}}", "roon:z", false, page));
+  assert(page->items[0].requires_input && page->items[1].requires_input && !page->items[2].requires_input);
   cJSON *long_root = cJSON_Parse(valid);
   cJSON *long_row = cJSON_GetArrayItem(
       cJSON_GetObjectItemCaseSensitive(

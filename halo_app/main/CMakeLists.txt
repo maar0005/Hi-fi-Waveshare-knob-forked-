@@ -57,5 +57,5 @@ idf_component_register(SRCS ${SRC_FILES}
     PRIV_REQUIRES esp_driver_ledc esp_driver_spi esp_driver_i2c nvs_flash esp_http_client esp_http_server esp_app_format json)
 set_property(TARGET ${COMPONENT_LIB} PROPERTY C_STANDARD 11)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE TARGET_PC=0 HIPHI_PRODUCT_NAME=\"hiphi-halo\"
-    PORTAL_BRAND_PRODUCT="HALO")
+    PORTAL_BRAND_PRODUCT="HALO" HIPHI_HALO_NATIVE_SETTINGS=1)
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=stringop-truncation)

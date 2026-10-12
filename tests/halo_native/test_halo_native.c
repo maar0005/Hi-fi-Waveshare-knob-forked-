@@ -44,6 +44,8 @@ int xTaskCreate(void (*task)(void *), const char *name, unsigned stack,
   return 1;
 }
 static uint32_t now;
+static bool fixture_ap, fixture_has_ip = true, fixture_ready = true;
+static controller_config_durability_t fixture_durability = CONTROLLER_CONFIG_DURABILITY_DURABLE;
 int64_t esp_timer_get_time(void) { return (int64_t)now * 1000; }
 bool bridge_client_get_request_base(char *out, size_t n) {
   snprintf(out, n, "http://bridge:8088");
@@ -67,7 +69,7 @@ int bridge_client_get_zones(bridge_zone_t *out, int max) {
 }
 bridge_zone_selection_result_t bridge_client_select_zone_value(const char *id) {
   (void)id;
-  return (bridge_zone_selection_result_t){0};
+  return (bridge_zone_selection_result_t){.found=true, .persisted=true};
 }
 void bridge_client_connection_snapshot(controller_connection_t *out) {
   memset(out, 0, sizeof(*out));
@@ -75,7 +77,7 @@ void bridge_client_connection_snapshot(controller_connection_t *out) {
 }
 bool controller_connection_ready(const controller_connection_t *c) {
   (void)c;
-  return true;
+  return fixture_ready;
 }
 void bridge_client_request_poll(void) {}
 void bridge_client_connection_status(char *summary, size_t n, char *detail,
@@ -85,17 +87,39 @@ void bridge_client_connection_status(char *summary, size_t n, char *detail,
 }
 bool controller_config_snapshot(controller_config_snapshot_t *out) {
   memset(out, 0, sizeof(*out));
+  out->durability = fixture_durability;
   snprintf(out->value.ssid, sizeof(out->value.ssid), "Listening room Wi-Fi");
+  out->value.wifi_count = 1;
+  snprintf(out->value.wifi[0].ssid, sizeof(out->value.wifi[0].ssid), "Listening room Wi-Fi");
   return true;
 }
 bool wifi_mgr_get_ip(char *out, size_t n) {
-  snprintf(out, n, "192.168.1.50");
-  return true;
+  snprintf(out, n, "%s", fixture_has_ip ? "192.168.1.50" : "");
+  return fixture_has_ip;
 }
 extern const lv_font_t lato_22, notosans_28;
 const lv_font_t *font_manager_get_small(void) { return &lato_22; }
 const lv_font_t *font_manager_get_normal(void) { return &notosans_28; }
+static int saved_brightness = 100, brightness_saves;
 void platform_display_set_brightness(int percent) { (void)percent; }
+int platform_display_load_brightness(void) { return saved_brightness; }
+bool platform_display_save_brightness(int percent) { saved_brightness = percent; brightness_saves++; return true; }
+
+bool wifi_mgr_is_ap_mode(void) { return fixture_ap; }
+bool wifi_mgr_start_provisioning(void) { fixture_ap = true; return true; }
+const char *wifi_mgr_get_hostname(void) { return "hiphi-halo-test"; }
+const char *wifi_mgr_get_last_error(void) { return "Network unavailable"; }
+int wifi_mgr_get_retry_count(void) { return 2; }
+int wifi_mgr_get_retry_max(void) { return 5; }
+const char *platform_provisioning_ssid(void) { return "hiphi-halo-setup"; }
+static int wifi_saves, bridge_saves;
+controller_config_write_result_t controller_config_upsert_wifi(const char *ssid, const char *pass, bool promote, controller_config_snapshot_t *out) { (void)pass;(void)promote;(void)out;assert(*ssid);wifi_saves++;return CONTROLLER_CONFIG_COMMITTED_VERIFIED; }
+bool controller_config_wifi_snapshot(controller_config_wifi_snapshot_t *out) { memset(out,0,sizeof(*out));return true; }
+void wifi_mgr_apply_wifi(const controller_config_wifi_snapshot_t *networks, bool reconnect) { (void)networks;(void)reconnect; }
+static int forgotten_networks;
+controller_config_write_result_t controller_config_remove_wifi_named(const char *ssid, controller_config_snapshot_t *out) { assert(*ssid);(void)out;forgotten_networks++;return CONTROLLER_CONFIG_COMMITTED_VERIFIED; }
+controller_config_write_result_t controller_config_promote_wifi_named(const char *ssid, controller_config_snapshot_t *out) { assert(*ssid);(void)out;return CONTROLLER_CONFIG_COMMITTED_VERIFIED; }
+controller_config_write_result_t controller_config_set_endpoint(const char *base, bool automatic, controller_config_snapshot_t *out) { (void)automatic;(void)out;assert(!*base || !strncmp(base,"http://",7));bridge_saves++;return CONTROLLER_CONFIG_COMMITTED_VERIFIED; }
 void ui_hide_zone_picker(void) {}
 bool ui_is_zone_picker_visible(void) { return false; }
 void ui_zone_picker_scroll(int delta) { (void)delta; }
@@ -396,6 +420,115 @@ int main(int argc, char **argv) {
   assert(page->count == 0);
   assert(xQueueReceive(requests, &request, 0));
   assert(!strcmp(request.zone, fixture_zone) && request.kind == BROWSE);
+  /* Search is a capability filter, not a substring match against music. */
+  controller_library_page_t filtered = {0};
+  filtered.count = 4; filtered.next_offset = 12;
+  snprintf(filtered.items[0].title, sizeof(filtered.items[0].title), "Search");
+  snprintf(filtered.items[0].location, sizeof(filtered.items[0].location), "opaque-search");
+  snprintf(filtered.items[0].image, sizeof(filtered.items[0].image), "/api/collections/image?ref=search_icon");
+  snprintf(filtered.items[1].title, sizeof(filtered.items[1].title), "Search");
+  snprintf(filtered.items[1].ref, sizeof(filtered.items[1].ref), "playable-album");
+  snprintf(filtered.items[2].title, sizeof(filtered.items[2].title), "Search Party");
+  snprintf(filtered.items[2].location, sizeof(filtered.items[2].location), "collection");
+  filtered.items[3].requires_input = true;
+  filter_library(&filtered);
+  assert(filtered.count == 2 && filtered.next_offset == 12);
+  assert(!strcmp(filtered.items[0].ref, "playable-album"));
+  assert(!strcmp(filtered.items[1].title, "Search Party"));
+  char normalized[128];
+  assert(normalize_bridge(" 192.168.1.2 ", normalized, sizeof(normalized)));
+  assert(!strcmp(normalized, "http://192.168.1.2:8088"));
+  assert(normalize_bridge("http://bridge.local:9000/", normalized, sizeof(normalized)));
+  assert(!strcmp(normalized, "http://bridge.local:9000"));
+  assert(!normalize_bridge("https://bridge", normalized, sizeof(normalized)));
+  assert(!normalize_bridge(":8088", normalized, sizeof(normalized)));
+  assert(!normalize_bridge("bridge:0", normalized, sizeof(normalized)));
+  assert(!normalize_bridge("bridge/path", normalized, sizeof(normalized)));
+  /* Recovery must be visible without discovering the invisible artwork tap. */
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
+  fixture_ap = true; fixture_has_ip = false;
+  advance(1100); halo_navigation_process();
+  assert(recovery_active && !lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN));
+  assert(strstr(lv_label_get_text(detail_label), "192.168.4.1"));
+  assert(halo_navigation_encoder(1));
+  snapshot(dir, "setup");
+  fixture_ap = false; fixture_has_ip = true; fixture_ready = false;
+  advance(1100); halo_navigation_process();
+  assert(recovery_active && !strcmp(recovery_title, "Music connection"));
+  fixture_ready = true;
+  advance(1100); halo_navigation_process();
+  assert(!recovery_active && lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN));
+  assert(artwork_only);
+  fixture_durability = CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY;
+  advance(1100); halo_navigation_process();
+  assert(recovery_active && strstr(recovery_title, "storage"));
+  fixture_durability = CONTROLLER_CONFIG_DURABILITY_DURABLE;
+  advance(1100); halo_navigation_process();
+  assert(!recovery_active);
+  change_screen(CONTROLLER_SCREEN_SETTINGS);
+  lv_obj_scroll_to_view(rows[1], LV_ANIM_OFF); advance(100); click(rows[1]);
+  assert(settings_detail == 1 && strstr(lv_label_get_text(detail_label), "Connected to music bridge"));
+  click(primary);
+  assert(connection_refresh_pending);
+  advance(5100); halo_navigation_process();
+  assert(!connection_refresh_pending && !strcmp(settings_notice, "Refresh timed out"));
+  snapshot(dir, "connection");
+  click(back);
+  lv_obj_scroll_to_view(rows[2], LV_ANIM_OFF); advance(100); click(rows[2]);
+  assert(settings_detail == 2);
+  click(primary);
+  assert(edit_kind == 1);
+  lv_textarea_set_text(entry, "Test network"); click(primary);
+  assert(edit_kind == 2);
+  snapshot(dir, "keyboard");
+  lv_textarea_set_text(entry, "bad"); click(primary);
+  assert(wifi_saves == 0 && edit_kind == 2);
+  lv_textarea_set_text(entry, "test-password"); click(primary);
+  assert(wifi_saves == 1 && edit_kind == 0 && !*edit_ssid);
+  click(back);
+  lv_obj_scroll_to_view(rows[3], LV_ANIM_OFF); advance(100); click(rows[3]);
+  click(primary);
+  assert(edit_kind == 3);
+  lv_textarea_set_text(entry, "https://unsupported"); click(primary);
+  assert(bridge_saves == 0 && edit_kind == 3);
+  lv_textarea_set_text(entry, "bridge.local"); click(primary);
+  assert(bridge_saves == 1 && edit_kind == 0);
+  click(back);
+  lv_obj_scroll_to_view(rows[6], LV_ANIM_OFF); advance(100); click(rows[6]);
+  assert(settings_detail == 6);
+  lv_obj_scroll_to_view(rows[1], LV_ANIM_OFF); advance(100); click(rows[1]);
+  assert(settings_detail == 7 && forgotten_networks == 0);
+  click(back);
+  assert(settings_detail == 6 && forgotten_networks == 0);
+  lv_obj_scroll_to_view(rows[1], LV_ANIM_OFF); advance(100); click(rows[1]);
+  click(primary);
+  assert(settings_detail == 6 && forgotten_networks == 1);
+  click(back);
+  brightness = 42; brightness_dirty = true; brightness_changed_ms = now;
+  advance(600); halo_navigation_process();
+  assert(brightness_saves == 0);
+  advance(200); halo_navigation_process();
+  assert(brightness_saves == 1 && platform_display_load_brightness() == 42);
+  /* A page containing only unsupported folders advances to the provider's
+   * offset instead of showing an empty/retry page or repeating offset zero. */
+  while (xQueueReceive(requests, &request, 0)) {}
+  busy = false;
+  change_screen(CONTROLLER_SCREEN_LIBRARY);
+  offset = 0; selected_index = 0;
+  halo_navigation_process();
+  assert(xQueueReceive(requests, &request, 0));
+  assert(request.kind == BROWSE && request.offset == 0);
+  result_t *search_only = calloc(1, sizeof(*search_only));
+  search_only->request = request; search_only->ok = true;
+  search_only->page.count = 1; search_only->page.next_offset = 12;
+  snprintf(search_only->page.items[0].title, sizeof(search_only->page.items[0].title), "Search");
+  snprintf(search_only->page.items[0].location, sizeof(search_only->page.items[0].location), "opaque-search");
+  assert(xQueueSend(results, &search_only, 0));
+  halo_navigation_process();
+  assert(page->count == 0 && offset == 12);
+  assert(xQueueReceive(requests, &request, 0));
+  assert(request.kind == BROWSE && request.offset == 12);
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
   lv_mem_monitor_t memory;
   lv_mem_monitor(&memory);
   assert(memory.total_size <= 96 * 1024);

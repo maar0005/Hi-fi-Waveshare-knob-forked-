@@ -8,7 +8,7 @@ Native embedded LVGL on HALO TOUCH V2: 360×360 round touch display and rotary i
 
 ## Users and purpose
 
-Listeners should see artwork and choose music, zones and routine controls without opening a general-purpose screen. Artwork leads the home view. Search is outside this prototype.
+Listeners should see artwork and choose music, zones and routine controls without opening a general-purpose screen. Artwork leads the home view. Search is unsupported and filtered from native Library; playable media titled Search remains visible. Setup and recovery must be visible without knowing an invisible gesture.
 
 ## Confirmed interaction
 

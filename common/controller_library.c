@@ -81,6 +81,8 @@ bool controller_library_parse(const char *json, const char *zone, bool mutation,
       goto done;
     copy_label(r->title, sizeof(r->title), str(item, "title"));
     copy_label(r->subtitle, sizeof(r->subtitle), str(item, "subtitle"));
+    r->requires_input = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(item, "requires_input")) ||
+        cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(item, "input_prompt"));
     const char *image = str(item, "image");
     if (controller_library_image_path(image))
       copy(r->image, sizeof(r->image), image);

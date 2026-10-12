@@ -9,6 +9,7 @@ typedef struct {
   char location[CONTROLLER_LIBRARY_HANDLE_SIZE],
       ref[CONTROLLER_LIBRARY_HANDLE_SIZE];
   char image[600];
+  bool requires_input;
 } controller_library_item_t;
 typedef struct {
   controller_library_item_t items[CONTROLLER_LIBRARY_PAGE_SIZE];

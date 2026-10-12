@@ -305,6 +305,32 @@ controller_config_write_result_t controller_config_remove_wifi(
     return result;
 }
 
+static controller_config_write_result_t mutate_wifi_named(
+    const char *ssid, bool promote, controller_config_snapshot_t *out_committed) {
+    if (!text_is_terminated(ssid, sizeof(((rk_wifi_entry_t *)0)->ssid), false) || !lock_config())
+        return CONTROLLER_CONFIG_NOT_COMMITTED;
+    if (!s_config.initialized) { unlock_config(); return CONTROLLER_CONFIG_NOT_COMMITTED; }
+    rk_cfg_t candidate = s_config.snapshot.value;
+    int index = -1;
+    for (int i = 0; i < candidate.wifi_count; i++)
+        if (!strcmp(candidate.wifi[i].ssid, ssid)) { index = i; break; }
+    if (index < 0) { unlock_config(); return CONTROLLER_CONFIG_NOT_COMMITTED; }
+    if (promote) rk_cfg_promote_wifi(&candidate, index);
+    else rk_cfg_remove_wifi(&candidate, index);
+    rk_cfg_sync_primary_wifi(&candidate);
+    controller_config_write_result_t result = commit_candidate_locked(&candidate, out_committed);
+    unlock_config();
+    return result;
+}
+controller_config_write_result_t controller_config_remove_wifi_named(
+    const char *ssid, controller_config_snapshot_t *out_committed) {
+    return mutate_wifi_named(ssid, false, out_committed);
+}
+controller_config_write_result_t controller_config_promote_wifi_named(
+    const char *ssid, controller_config_snapshot_t *out_committed) {
+    return mutate_wifi_named(ssid, true, out_committed);
+}
+
 controller_config_write_result_t controller_config_set_endpoint(
     const char *bridge_base, bool from_mdns,
     controller_config_snapshot_t *out_committed) {

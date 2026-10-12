@@ -9,6 +9,8 @@
 #include "lvgl.h"
 #include "platform_display_halo.h"
 #include "portal_brand.h"
+#include "platform/platform_identity.h"
+#include <ctype.h>
 #include "src/misc/cache/instance/lv_image_cache.h"
 #include "src/misc/cache/instance/lv_image_header_cache.h"
 #include "ui.h"
@@ -72,6 +74,13 @@ static struct {
 } covers[CONTROLLER_LIBRARY_PAGE_SIZE];
 static bool chooser;
 static bool settings_about, settings_reset;
+static int settings_detail, edit_kind, forget_index = -1;
+static char edit_ssid[33], forget_ssid[33], displayed_networks[RK_MAX_WIFI][33];
+static lv_obj_t *entry, *detail_label;
+static bool recovery_active, brightness_dirty;
+static int64_t brightness_changed_ms, recovery_check_ms;
+static char recovery_title[64], recovery_text[600];
+static char settings_notice[100];
 static void return_to_artwork(void);
 static int pending_mutation = -1;
 static unsigned pending_mutation_generation;
@@ -194,6 +203,9 @@ static void button_text(lv_obj_t *button, const char *text) {
 static void change_screen(int next) {
   screen = next;
   settings_about = settings_reset = false;
+  settings_detail = edit_kind = 0;
+  memset(edit_ssid, 0, sizeof(edit_ssid));
+  settings_notice[0] = 0;
   ui_set_background_tap_handler(screen == CONTROLLER_SCREEN_NOW_PLAYING
                                     ? return_to_artwork : NULL);
   pending_mutation = -1;
@@ -367,17 +379,178 @@ enum {
   ACTION_NEXT,
   ACTION_PREVIOUS,
   ACTION_RESET_CONFIRM,
+  ACTION_REFRESH,
+  ACTION_EDIT_WIFI,
+  ACTION_EDIT_BRIDGE,
+  ACTION_SETUP_WIFI,
+  ACTION_AUTO_BRIDGE,
+  ACTION_SAVE_ENTRY,
+  ACTION_WIFI_DETAILS,
+  ACTION_FORGET_NETWORK_CONFIRM,
+  ACTION_USE_NETWORK = 1000,
+  ACTION_FORGET_NETWORK = 1100,
   ACTION_ROW = 100
 };
 static void return_to_artwork(void) {
   if (screen == CONTROLLER_SCREEN_NOW_PLAYING)
     change_screen(CONTROLLER_SCREEN_ARTWORK);
 }
+static bool normalize_bridge(const char *input, char *out, size_t capacity) {
+  while (isspace((unsigned char)*input)) input++;
+  size_t length = strlen(input);
+  while (length && isspace((unsigned char)input[length - 1])) length--;
+  if (!length || length >= 128) return false;
+  char value[128];
+  memcpy(value, input, length); value[length] = 0;
+  if (strncmp(value, "http://", 7) && strstr(value, "://")) return false;
+  const char *host = !strncmp(value, "http://", 7) ? value + 7 : value;
+  if (!*host || strchr(host, '@') || strchr(host, '?') || strchr(host, '#')) return false;
+  char authority[128];
+  snprintf(authority, sizeof(authority), "%s", host);
+  char *slash = strchr(authority, '/');
+  if (slash) { if (slash[1]) return false; *slash = 0; }
+  if (!*authority || authority[0] == ':') return false;
+  for (const char *c = authority; *c; c++)
+    if (isspace((unsigned char)*c) || (unsigned char)*c < 32) return false;
+  bool port = authority[0] == '[' ? strstr(authority, "]:") != NULL : strchr(authority, ':') != NULL;
+  if (authority[0] == '[') {
+    char *close = strchr(authority, ']');
+    if (!close || close == authority + 1 || (close[1] && close[1] != ':')) return false;
+  } else {
+    const char *colon = strchr(authority, ':');
+    if (colon && strchr(colon + 1, ':')) return false;
+    for (const char *c = authority; *c && *c != ':'; c++)
+      if (!isalnum((unsigned char)*c) && *c != '.' && *c != '-' && *c != '_') return false;
+  }
+  if (port) {
+    const char *colon = strrchr(authority, ':');
+    char *end;
+    for (const char *c = colon + 1; *c; c++) if (!isdigit((unsigned char)*c)) return false;
+    long number = strtol(colon + 1, &end, 10);
+    if (!colon[1] || *end || number < 1 || number > 65535) return false;
+  }
+  int n = snprintf(out, capacity, "http://%s%s", authority, port ? "" : ":8088");
+  return n > 0 && (size_t)n < capacity;
+}
+static bool search_folder(const controller_library_item_t *item) {
+  if (item->requires_input) return true;
+  if (!*item->location || *item->ref) return false;
+  const char *p = item->title, *word = "search";
+  while (*p && *word && tolower((unsigned char)*p) == *word) { p++; word++; }
+  return !*p && !*word;
+}
+static void filter_library(controller_library_page_t *value) {
+  int count = 0;
+  for (int i = 0; i < value->count; i++)
+    if (!search_folder(&value->items[i])) value->items[count++] = value->items[i];
+  value->count = count;
+}
+static void refresh_connection(void) {
+  char ip[32] = "";
+  if (!wifi_mgr_get_ip(ip, sizeof(ip)) && !wifi_mgr_is_ap_mode()) {
+    controller_config_wifi_snapshot_t networks;
+    if (controller_config_wifi_snapshot(&networks) && networks.count) wifi_mgr_apply_wifi(&networks, true);
+    else wifi_mgr_start_provisioning();
+  }
+  controller_connection_t connection;
+  bridge_client_connection_snapshot(&connection);
+  connection_observed_before = connection.observed_ms;
+  connection_refresh_pending = true;
+  connection_refresh_ms = esp_timer_get_time() / 1000;
+  bridge_client_request_poll();
+}
+static void save_entry(void) {
+  if (!entry) return;
+  const char *value = lv_textarea_get_text(entry);
+  if (edit_kind == 1) {
+    if (!*value || strlen(value) > 32) { lv_label_set_text(subtitle, "Enter a network name"); return; }
+    snprintf(edit_ssid, sizeof(edit_ssid), "%s", value);
+    edit_kind = 2;
+    render();
+    return;
+  }
+  controller_config_write_result_t result = CONTROLLER_CONFIG_NOT_COMMITTED;
+  if (edit_kind == 2) {
+    if (strlen(value) == 64) {
+      for (const char *c = value; *c; c++)
+        if (!isxdigit((unsigned char)*c)) { lv_label_set_text(subtitle, "64-character keys must be hex"); return; }
+    }
+    if (*value && strlen(value) < 8) { lv_label_set_text(subtitle, "Password needs 8+ characters"); return; }
+    result = controller_config_upsert_wifi(edit_ssid, value, true, NULL);
+    if (result != CONTROLLER_CONFIG_NOT_COMMITTED) {
+      controller_config_wifi_snapshot_t networks;
+      if (controller_config_wifi_snapshot(&networks)) wifi_mgr_apply_wifi(&networks, true);
+    }
+  } else if (edit_kind == 3) {
+    char base[128];
+    if (!normalize_bridge(value, base, sizeof(base))) { lv_label_set_text(subtitle, "Enter a host or host:port"); return; }
+    result = controller_config_set_endpoint(base, false, NULL);
+    if (result != CONTROLLER_CONFIG_NOT_COMMITTED) bridge_client_request_poll();
+  }
+  if (result == CONTROLLER_CONFIG_NOT_COMMITTED) { lv_label_set_text(subtitle, "Could not save. Try again."); return; }
+  edit_kind = 0;
+  memset(edit_ssid, 0, sizeof(edit_ssid));
+  snprintf(settings_notice, sizeof(settings_notice), "%s", result == CONTROLLER_CONFIG_COMMITTED_VERIFIED ? "Saved" : "Saved; storage verification failed");
+  render();
+}
+static void keyboard_event(lv_event_t *event) {
+  if (lv_event_get_code(event) == LV_EVENT_READY) save_entry();
+  else if (lv_event_get_code(event) == LV_EVENT_CANCEL) { edit_kind = 0; memset(edit_ssid, 0, sizeof(edit_ssid)); render(); }
+}
 static void tap(lv_event_t *event) {
   int action = (int)(intptr_t)lv_event_get_user_data(event);
+  if (action == ACTION_FORGET_NETWORK_CONFIRM && settings_detail == 7 && forget_index >= 0) {
+    forget_index = -1;
+    controller_config_write_result_t result = controller_config_remove_wifi_named(forget_ssid, NULL);
+    memset(forget_ssid, 0, sizeof(forget_ssid));
+    if (result != CONTROLLER_CONFIG_NOT_COMMITTED) {
+      controller_config_wifi_snapshot_t networks;
+      if (controller_config_wifi_snapshot(&networks)) wifi_mgr_apply_wifi(&networks, true);
+    }
+    settings_detail = 6;
+    snprintf(settings_notice, sizeof(settings_notice), "%s", result == CONTROLLER_CONFIG_NOT_COMMITTED ? "Could not forget network" : "Network forgotten");
+    render(); return;
+  }
+  if (action >= ACTION_FORGET_NETWORK && action < ACTION_FORGET_NETWORK + RK_MAX_WIFI && settings_detail == 6) {
+    forget_index = action - ACTION_FORGET_NETWORK;
+    snprintf(forget_ssid, sizeof(forget_ssid), "%s", displayed_networks[forget_index]);
+    settings_detail = 7;
+    render(); return;
+  }
+  if (action >= ACTION_USE_NETWORK && action < ACTION_USE_NETWORK + RK_MAX_WIFI && settings_detail == 6) {
+    controller_config_write_result_t result = controller_config_promote_wifi_named(displayed_networks[action - ACTION_USE_NETWORK], NULL);
+    if (result != CONTROLLER_CONFIG_NOT_COMMITTED) {
+      controller_config_wifi_snapshot_t networks;
+      if (controller_config_wifi_snapshot(&networks)) wifi_mgr_apply_wifi(&networks, true);
+    }
+    snprintf(settings_notice, sizeof(settings_notice), "%s", result == CONTROLLER_CONFIG_NOT_COMMITTED ? "Could not switch network" : "Connecting…");
+    render(); return;
+  }
+  if (action == ACTION_WIFI_DETAILS) {
+    change_screen(CONTROLLER_SCREEN_SETTINGS); settings_detail = 2; render(); return;
+  }
+  if (action == ACTION_REFRESH) { refresh_connection(); return; }
+  if (action == ACTION_SAVE_ENTRY) { save_entry(); return; }
+  if (action == ACTION_EDIT_WIFI || action == ACTION_EDIT_BRIDGE) {
+    edit_kind = action == ACTION_EDIT_WIFI ? 1 : 3;
+    settings_notice[0] = 0;
+    render(); return;
+  }
+  if (action == ACTION_SETUP_WIFI) {
+    snprintf(settings_notice, sizeof(settings_notice), "%s", wifi_mgr_start_provisioning() ? "Setup Wi-Fi started" : "Could not start setup Wi-Fi");
+    render(); return;
+  }
+  if (action == ACTION_AUTO_BRIDGE) {
+    controller_config_write_result_t result = controller_config_set_endpoint("", true, NULL);
+    snprintf(settings_notice, sizeof(settings_notice), "%s", result == CONTROLLER_CONFIG_NOT_COMMITTED ? "Could not save" : "Finding music bridge…");
+    bridge_client_request_poll(); render(); return;
+  }
   if (action == ACTION_RESET_CONFIRM && screen == CONTROLLER_SCREEN_SETTINGS && settings_reset) {
     settings_reset = false;
     wifi_mgr_forget_wifi();
+    settings_reset = true;
+    snprintf(settings_notice, sizeof(settings_notice), "Reset did not complete. Try again.");
+    render();
     return;
   }
   if (action == ACTION_MENU) {
@@ -409,8 +582,11 @@ static void tap(lv_event_t *event) {
     return;
   }
   if (action == ACTION_BACK) {
-    if (screen == CONTROLLER_SCREEN_SETTINGS && (settings_about || settings_reset)) {
-      settings_about = settings_reset = false;
+    if (screen == CONTROLLER_SCREEN_SETTINGS && (settings_detail || edit_kind)) {
+      if (edit_kind) { edit_kind = 0; memset(edit_ssid, 0, sizeof(edit_ssid)); }
+      else if (settings_detail == 7) { settings_detail = 6; forget_index = -1; }
+      else { settings_detail = 0; settings_about = settings_reset = false; }
+      settings_notice[0] = 0;
       render();
       return;
     }
@@ -423,7 +599,11 @@ static void tap(lv_event_t *event) {
   if (screen == CONTROLLER_SCREEN_ZONES && action >= ACTION_ROW) {
     int i = action - ACTION_ROW;
     if (i < zone_count) {
-      bridge_client_select_zone_value(zone_rows[i].id);
+      bridge_zone_selection_result_t result = bridge_client_select_zone_value(zone_rows[i].id);
+      if (!result.found || !result.persisted) {
+        lv_label_set_text(subtitle, !result.found ? "Zone unavailable. Try again." : "Zone could not be saved.");
+        return;
+      }
       change_screen(CONTROLLER_SCREEN_ARTWORK);
     }
     return;
@@ -433,24 +613,12 @@ static void tap(lv_event_t *event) {
     if (setting_index == 0) {
       /* Brightness is a direct touch slider, not an undisclosed cycle. */
       return;
-    } else if (setting_index == 1) {
-      controller_connection_t connection;
-      bridge_client_connection_snapshot(&connection);
-      connection_observed_before = connection.observed_ms;
-      connection_refresh_pending = true;
-      connection_refresh_ms = esp_timer_get_time() / 1000;
-      if (rows[1])
-        lv_label_set_text(lv_obj_get_child(rows[1], 1), "Checking…");
-      bridge_client_request_poll();
-    } else if (setting_index == 4 || setting_index == 5) {
+    } else {
+      settings_detail = setting_index;
       settings_about = setting_index == 4;
       settings_reset = setting_index == 5;
+      settings_notice[0] = 0;
       render();
-    } else {
-      char ip[32] = "";
-      wifi_mgr_get_ip(ip, sizeof(ip));
-      lv_label_set_text_fmt(subtitle,
-                            "Setup on your phone:\nhttp://%s/settings", ip);
     }
     return;
   }
@@ -558,6 +726,8 @@ static void brightness_changed(lv_event_t *event) {
   brightness = lv_slider_get_value(lv_event_get_target(event));
   platform_display_set_brightness(brightness);
   lv_label_set_text_fmt(lv_event_get_user_data(event), "%d%%", brightness);
+  brightness_dirty = true;
+  brightness_changed_ms = esp_timer_get_time() / 1000;
 }
 static void carousel_end(lv_event_t *e) {
   (void)e;
@@ -643,6 +813,25 @@ static void render(void) {
   memset(rows, 0, sizeof(rows));
   lv_obj_clean(overlay);
   scroller = NULL;
+  entry = detail_label = NULL;
+  if (screen == CONTROLLER_SCREEN_ARTWORK && recovery_active) {
+    lv_obj_add_flag(home_button, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(art_touch, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(overlay, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(overlay);
+    label(&heading, overlay, 38, 260, font_manager_get_small());
+    lv_label_set_text(heading, recovery_title);
+    label(&detail_label, overlay, 92, 254, font_manager_get_small());
+    lv_label_set_long_mode(detail_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_height(detail_label, 170);
+    lv_label_set_text(detail_label, recovery_text);
+    primary = button(overlay, -52, 278, 96, ACTION_SETTINGS);
+    button_text(primary, "Settings");
+    secondary = button(overlay, 52, 278, 96, wifi_mgr_is_ap_mode() ? ACTION_WIFI_DETAILS : ACTION_REFRESH);
+    button_text(secondary, wifi_mgr_is_ap_mode() ? "Wi-Fi" : "Retry");
+    rebuilding = false;
+    return;
+  }
   if (screen == CONTROLLER_SCREEN_ARTWORK ||
       screen == CONTROLLER_SCREEN_NOW_PLAYING) {
     lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
@@ -708,22 +897,108 @@ static void render(void) {
     focus_row(zone_index);
   } else if (screen == CONTROLLER_SCREEN_SETTINGS) {
     lv_label_set_text(heading, "Settings");
-    if (settings_about || settings_reset) {
+    if (edit_kind) {
       lv_obj_add_flag(scroller, LV_OBJ_FLAG_HIDDEN);
-      lv_label_set_text(heading, settings_about ? "About" : "Factory reset?");
-      lv_obj_t *text;
-      label(&text, overlay, 112, 252, font_manager_get_small());
-      lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
-      if (settings_about) {
-        char ip[32] = "";
-        wifi_mgr_get_ip(ip, sizeof(ip));
-        lv_label_set_text_fmt(text, "HiPhi HALO\nFirmware %s\n%s\nhiphi.audio", portal_brand_firmware_version(), ip);
-      } else {
-        lv_label_set_text(text, "Erase Wi-Fi and all saved settings?\nHALO will restart in setup mode.");
-        primary = button(overlay, 0, 278, 152, ACTION_RESET_CONFIRM);
-        button_text(primary, "Reset device");
+      lv_label_set_text(heading, edit_kind == 1 ? "Network name" : edit_kind == 2 ? "Wi-Fi password" : "Music bridge");
+      entry = lv_textarea_create(overlay);
+      lv_obj_set_size(entry, 252, 42);
+      lv_obj_align(entry, LV_ALIGN_TOP_MID, 0, 105);
+      lv_textarea_set_one_line(entry, true);
+      lv_textarea_set_max_length(entry, edit_kind == 1 ? 32 : edit_kind == 2 ? 64 : 127);
+      lv_textarea_set_password_mode(entry, edit_kind == 2);
+      if (edit_kind == 1) {
+        controller_config_snapshot_t cfg = {0}; controller_config_snapshot(&cfg);
+        lv_textarea_set_text(entry, cfg.value.ssid);
+      } else if (edit_kind == 3) {
+        char base[128] = ""; bridge_client_get_bridge_url(base, sizeof(base));
+        lv_textarea_set_text(entry, base);
       }
-      lv_label_set_text(subtitle, "");
+      lv_obj_t *keyboard = lv_keyboard_create(overlay);
+      lv_obj_set_size(keyboard, 276, 99);
+      lv_obj_align(keyboard, LV_ALIGN_TOP_MID, 0, 169);
+      lv_obj_set_style_bg_color(entry, lv_color_hex(0x151515), 0);
+      lv_obj_set_style_text_color(entry, lv_color_hex(0xeeeeee), 0);
+      lv_obj_set_style_border_color(entry, lv_color_hex(0x526573), 0);
+      lv_obj_set_style_bg_color(keyboard, lv_color_hex(0x080808), 0);
+      lv_obj_set_style_bg_color(keyboard, lv_color_hex(0x252525), LV_PART_ITEMS);
+      lv_obj_set_style_text_color(keyboard, lv_color_hex(0xeeeeee), LV_PART_ITEMS);
+      lv_obj_set_style_bg_color(keyboard, lv_color_hex(0x526573), LV_PART_ITEMS | LV_STATE_PRESSED);
+      lv_keyboard_set_textarea(keyboard, entry);
+      lv_obj_add_event_cb(keyboard, keyboard_event, LV_EVENT_READY, NULL);
+      lv_obj_add_event_cb(keyboard, keyboard_event, LV_EVENT_CANCEL, NULL);
+      primary = button(overlay, 0, 278, 120, ACTION_SAVE_ENTRY);
+      button_text(primary, edit_kind == 1 ? "Next" : "Save");
+      lv_obj_align(subtitle, LV_ALIGN_TOP_MID, 0, 148);
+      lv_obj_set_style_text_font(subtitle, LV_FONT_DEFAULT, 0);
+      lv_label_set_text(subtitle, edit_kind == 2 ? "Empty for an open network" : edit_kind == 3 ? "Host; default port 8088" : "Wi-Fi name (SSID)");
+      rebuilding = false;
+      return;
+    }
+    if (settings_detail) {
+      static const char *titles[] = {"", "Connection", "Wi-Fi", "Music bridge", "About", "Factory reset?", "Saved networks", "Forget network?"};
+      lv_label_set_text(heading, titles[settings_detail]);
+      lv_obj_set_height(scroller, 156);
+      detail_label = lv_label_create(scroller);
+      lv_obj_set_width(detail_label, 254);
+      lv_obj_set_style_text_font(detail_label, font_manager_get_small(), 0);
+      lv_obj_set_style_text_color(detail_label, lv_color_hex(0xeeeeee), 0);
+      lv_label_set_long_mode(detail_label, LV_LABEL_LONG_WRAP);
+      char text[900], ip[32] = "";
+      controller_config_snapshot_t cfg = {0}; controller_config_snapshot(&cfg);
+      bool has_ip = wifi_mgr_get_ip(ip, sizeof(ip));
+      if (settings_detail == 1) {
+        char summary[100], details[600];
+        bridge_client_connection_status(summary, sizeof(summary), details, sizeof(details));
+        snprintf(text, sizeof(text), "%s\n%s", summary, details);
+        primary = button(overlay, 0, 278, 120, ACTION_REFRESH); button_text(primary, "Refresh");
+      } else if (settings_detail == 2) {
+        snprintf(text, sizeof(text), "Network: %s\n%s\n%s%s", *cfg.value.ssid ? cfg.value.ssid : "Not configured", has_ip ? ip : "No network address", wifi_mgr_is_ap_mode() ? "Connect to hiphi-halo-setup\nOpen 192.168.4.1" : "Use Change below, or Setup for phone configuration.", "");
+        primary = button(overlay, -52, 278, 96, ACTION_EDIT_WIFI); button_text(primary, "Change");
+        secondary = button(overlay, 52, 278, 96, ACTION_SETUP_WIFI); button_text(secondary, "Setup");
+      } else if (settings_detail == 3) {
+        char base[128] = "", summary[100], details[400];
+        bridge_client_get_bridge_url(base, sizeof(base));
+        bridge_client_connection_status(summary, sizeof(summary), details, sizeof(details));
+        snprintf(text, sizeof(text), "%s\n%s\n%s\n%s", *base ? base : "Automatic discovery", cfg.value.bridge_from_mdns ? "Discovered on your network" : "Manual address", summary, details);
+        primary = button(overlay, -52, 278, 96, ACTION_EDIT_BRIDGE); button_text(primary, "Edit");
+        secondary = button(overlay, 52, 278, 96, ACTION_AUTO_BRIDGE); button_text(secondary, "Auto");
+      } else if (settings_detail == 4) {
+        snprintf(text, sizeof(text), "HiPhi HALO\n%s\nFirmware %s\n%s\n%s\nhiphi.audio", *cfg.value.knob_name ? cfg.value.knob_name : wifi_mgr_get_hostname(), portal_brand_firmware_version(), wifi_mgr_get_hostname(), has_ip ? ip : "No network address");
+      } else if (settings_detail == 6) {
+        lv_label_set_text(detail_label, cfg.value.wifi_count ? "Tap Use to connect, or Forget." : "No saved networks");
+        memset(displayed_networks, 0, sizeof(displayed_networks));
+        for (int i = 0; i < cfg.value.wifi_count && i < RK_MAX_WIFI; i++) {
+          snprintf(displayed_networks[i], sizeof(displayed_networks[i]), "%s", cfg.value.wifi[i].ssid);
+          char name[80];
+          snprintf(name, sizeof(name), "Use: %s", cfg.value.wifi[i].ssid);
+          list_row(name, NULL, ACTION_USE_NETWORK + i, i * 2);
+          snprintf(name, sizeof(name), "Forget: %s", cfg.value.wifi[i].ssid);
+          list_row(name, NULL, ACTION_FORGET_NETWORK + i, i * 2 + 1);
+        }
+        lv_obj_align(scroller, LV_ALIGN_TOP_MID, 0, 120);
+        lv_obj_set_height(scroller, 180);
+        lv_obj_align(subtitle, LV_ALIGN_TOP_MID, 0, 103);
+        lv_obj_set_style_text_font(subtitle, LV_FONT_DEFAULT, 0);
+        lv_label_set_text(subtitle, settings_notice);
+        rebuilding = false; return;
+      } else if (settings_detail == 7) {
+        snprintf(text, sizeof(text), "Forget %s?\nOther saved networks remain.", *forget_ssid ? forget_ssid : "this network");
+        primary = button(overlay, 0, 278, 152, ACTION_FORGET_NETWORK_CONFIRM); button_text(primary, "Forget");
+      } else {
+        snprintf(text, sizeof(text), "Erase Wi-Fi and all saved settings?\nHALO will restart in setup mode.");
+        primary = button(overlay, 0, 278, 152, ACTION_RESET_CONFIRM); button_text(primary, "Reset device");
+      }
+      if (cfg.durability == CONTROLLER_CONFIG_DURABILITY_DEGRADED_COMMIT || cfg.durability == CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY)
+        strncat(text, "\nSettings storage unavailable or unverified", sizeof(text) - strlen(text) - 1);
+      lv_label_set_text(detail_label, text);
+      lv_obj_align(subtitle, LV_ALIGN_TOP_MID, 0, 80);
+      lv_obj_set_style_text_font(subtitle, LV_FONT_DEFAULT, 0);
+      lv_obj_set_style_bg_color(subtitle, lv_color_hex(0x080808), 0);
+      lv_obj_set_style_bg_opa(subtitle, LV_OPA_COVER, 0);
+      lv_obj_align(scroller, LV_ALIGN_TOP_MID, 0, 120);
+      lv_obj_set_height(scroller, 145);
+      lv_obj_align(subtitle, LV_ALIGN_TOP_MID, 0, 103);
+      lv_label_set_text(subtitle, settings_notice);
       rebuilding = false;
       return;
     }
@@ -753,6 +1028,7 @@ static void render(void) {
     list_row("Music bridge", base, ACTION_ROW + 3, 3);
     list_row("About", "Device and firmware", ACTION_ROW + 4, 4);
     list_row("Factory reset", "Erase saved settings", ACTION_ROW + 5, 5);
+    list_row("Saved networks", "Switch or forget Wi-Fi", ACTION_ROW + 6, 6);
     lv_label_set_text(subtitle, "Tap connection to refresh");
     focus_row(setting_index);
   } else {
@@ -763,8 +1039,13 @@ static void render(void) {
                                       : "Loading library…");
     } else if (!page || !page->count) {
       list_row("Retry library", NULL, ACTION_OPEN, 0);
-      lv_label_set_text(subtitle,
-                        page && *page->notice ? page->notice : "No items");
+      lv_obj_t *message = lv_label_create(scroller);
+      lv_obj_set_width(message, 252);
+      lv_obj_set_style_text_font(message, font_manager_get_small(), 0);
+      lv_obj_set_style_text_color(message, lv_color_hex(0xeeeeee), 0);
+      lv_label_set_long_mode(message, LV_LABEL_LONG_WRAP);
+      lv_label_set_text(message, page && *page->notice ? page->notice : "No items");
+      lv_label_set_text(subtitle, "");
     } else if (chooser) {
       list_row(page->items[selected_index].title, NULL, ACTION_OPEN, -1);
       primary = button(overlay, -52, 278, 96, ACTION_PLAY);
@@ -910,6 +1191,8 @@ void halo_navigation_process(void) {
     if (!page)
       return;
     page->next_offset = -1;
+    brightness = platform_display_load_brightness();
+    platform_display_set_brightness(brightness);
     ui_set_controls_visible(false);
     ui_set_artwork_only(true);
     render();
@@ -973,6 +1256,12 @@ void halo_navigation_process(void) {
         }
       } else if (result->request.kind == BROWSE) {
         *page = result->page;
+        filter_library(page);
+        if (result->ok && !page->count && page->next_offset > offset) {
+          offset = page->next_offset;
+          selected_index = 0;
+          pending_browse = true;
+        }
         if (desired_absolute >= 0 && result->ok && page->count) {
           if (desired_absolute >= offset + page->count &&
               page->next_offset >= 0) {
@@ -1055,6 +1344,56 @@ void halo_navigation_process(void) {
         lv_label_set_text(text, summary);
     }
   }
+  int64_t clock_ms = esp_timer_get_time() / 1000;
+  if (brightness_dirty && clock_ms - brightness_changed_ms >= 700) {
+    brightness_dirty = false;
+    bool saved = platform_display_save_brightness(brightness);
+    snprintf(settings_notice, sizeof(settings_notice), "%s", saved ? "Brightness saved" : "Brightness could not be saved");
+    if (screen == CONTROLLER_SCREEN_SETTINGS && !settings_detail && !edit_kind)
+      lv_label_set_text(subtitle, settings_notice);
+  }
+  if (clock_ms - recovery_check_ms >= 1000) {
+    recovery_check_ms = clock_ms;
+    controller_config_snapshot_t cfg = {0}; controller_config_snapshot(&cfg);
+    controller_connection_t connection; bridge_client_connection_snapshot(&connection);
+    char title[64] = "", text[600] = "", ip[32] = "";
+    bool has_ip = wifi_mgr_get_ip(ip, sizeof(ip));
+    bool recovery = true;
+    if (wifi_mgr_is_ap_mode()) {
+      snprintf(title, sizeof(title), "Set up Wi-Fi");
+      snprintf(text, sizeof(text), "On your phone:\nJoin %s\nOpen 192.168.4.1\nOr use Wi-Fi in Settings.", platform_provisioning_ssid());
+    } else if (!has_ip) {
+      snprintf(title, sizeof(title), "Connecting to Wi-Fi");
+      snprintf(text, sizeof(text), "%s\nAttempt %d of %d\nUse Wi-Fi in Settings to change networks.", wifi_mgr_get_last_error(), wifi_mgr_get_retry_count(), wifi_mgr_get_retry_max());
+    } else if (cfg.durability == CONTROLLER_CONFIG_DURABILITY_DEGRADED_COMMIT || cfg.durability == CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY) {
+      snprintf(title, sizeof(title), "Settings storage warning");
+      snprintf(text, sizeof(text), "Changes may not survive a restart.\nSee Connection in Settings.");
+    } else if (!controller_connection_ready(&connection)) {
+      char summary[100];
+      snprintf(title, sizeof(title), "Music connection");
+      bridge_client_connection_status(summary, sizeof(summary), text, sizeof(text));
+      if (!*text) snprintf(text, sizeof(text), "%s", summary);
+    } else recovery = false;
+    bool changed = recovery_active != recovery || strcmp(recovery_title, title) || strcmp(recovery_text, text);
+    recovery_active = recovery;
+    snprintf(recovery_title, sizeof(recovery_title), "%s", title);
+    snprintf(recovery_text, sizeof(recovery_text), "%s", text);
+    if (changed && screen == CONTROLLER_SCREEN_ARTWORK) render();
+    if (connection_refresh_pending) {
+      if (connection.observed_ms > connection_observed_before) connection_refresh_pending = false;
+      else if (clock_ms - connection_refresh_ms >= 5000) {
+        connection_refresh_pending = false;
+        snprintf(settings_notice, sizeof(settings_notice), "Refresh timed out");
+      }
+    }
+    if (screen == CONTROLLER_SCREEN_SETTINGS && settings_detail == 1 && !edit_kind && detail_label) {
+      char summary[100], details[600], output[750];
+      bridge_client_connection_status(summary, sizeof(summary), details, sizeof(details));
+      snprintf(output, sizeof(output), "%s\n%s%s", summary, details, cfg.durability == CONTROLLER_CONFIG_DURABILITY_DEGRADED_COMMIT || cfg.durability == CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY ? "\nSettings storage unavailable or unverified" : "");
+      if (strcmp(lv_label_get_text(detail_label), output)) lv_label_set_text(detail_label, output);
+      lv_label_set_text(subtitle, connection_refresh_pending ? "Checking…" : settings_notice);
+    }
+  }
   if (screen == CONTROLLER_SCREEN_LIBRARY && !busy) {
     if (pending_mutation >= 0) {
       int kind = pending_mutation;
@@ -1069,6 +1408,7 @@ void halo_navigation_process(void) {
   }
 }
 bool halo_navigation_encoder(int delta) {
+  if (screen == CONTROLLER_SCREEN_ARTWORK && recovery_active) return true;
   if (screen == CONTROLLER_SCREEN_MENU) {
     menu_index += delta;
     if (menu_index < 0)
@@ -1099,12 +1439,16 @@ bool halo_navigation_encoder(int delta) {
     return true;
   }
   if (screen == CONTROLLER_SCREEN_SETTINGS) {
-    if (settings_about || settings_reset) return true;
+    if (edit_kind) return true;
+    if (settings_detail) {
+      if (scroller) lv_obj_scroll_by(scroller, 0, -delta * 45, LV_ANIM_ON);
+      return true;
+    }
     setting_index += delta;
     if (setting_index < 0)
       setting_index = 0;
-    if (setting_index > 5)
-      setting_index = 5;
+    if (setting_index > 6)
+      setting_index = 6;
     focus_row(setting_index);
     return true;
   }

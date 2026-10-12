@@ -24,6 +24,7 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <nvs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "lvgl.h"
@@ -94,6 +95,28 @@ void platform_display_set_brightness(int percent) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
+int platform_display_load_brightness(void) {
+    nvs_handle_t handle;
+    uint8_t value = 100;
+    if (nvs_open("hiphi_halo", NVS_READONLY, &handle) == ESP_OK) {
+        if (nvs_get_u8(handle, "brightness", &value) != ESP_OK) value = 100;
+        nvs_close(handle);
+    }
+    return value >= 5 && value <= 100 ? value : 100;
+}
+
+bool platform_display_save_brightness(int percent) {
+    if (percent < 5 || percent > 100) return false;
+    nvs_handle_t handle;
+    if (nvs_open("hiphi_halo", NVS_READWRITE, &handle) != ESP_OK) return false;
+    esp_err_t err = nvs_set_u8(handle, "brightness", (uint8_t)percent);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    uint8_t saved = 0;
+    if (err == ESP_OK) err = nvs_get_u8(handle, "brightness", &saved);
+    nvs_close(handle);
+    return err == ESP_OK && saved == percent;
+}
+
 static void backlight_init(void) {
     ledc_timer_config_t timer = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -108,7 +131,7 @@ static void backlight_init(void) {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .timer_sel = LEDC_TIMER_0,
-        .duty = BL_MAX_DUTY, /* always on, full brightness */
+        .duty = (uint32_t)platform_display_load_brightness() * BL_MAX_DUTY / 100,
         .hpoint = 0,
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ch));
