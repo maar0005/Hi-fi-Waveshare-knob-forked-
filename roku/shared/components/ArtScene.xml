@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ArtScene" extends="Scene">
+  <interface>
+    <field id="memoryPressure" type="boolean" value="false" onChange="onMemoryPressure" />
+    <field id="profile" type="string" value="screensaver" />
+    <field id="settings" type="assocarray" onChange="configure" />
+    <field id="done" type="boolean" value="false" />
+    <field id="client" type="node" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/source/Model.brs" />
+  <script type="text/brightscript" uri="pkg:/components/ArtScene.brs" />
+  <children>
+    <Group id="artLayer" />
+    <Animation id="artFade" duration="0.18" easeFunction="outCubic">
+      <FloatFieldInterpolator id="artFadeTarget" key="[0,1]" keyValue="[0.65,1]" />
+    </Animation>
+    <Rectangle id="strip" color="0x101012EE" visible="false" />
+    <Label id="metadata" font="font:SmallSystemFont" color="0xE8E8E8FF" />
+    <BridgeTask id="network" />
+  </children>
+</component>
