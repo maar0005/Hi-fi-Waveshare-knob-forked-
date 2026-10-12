@@ -13,6 +13,10 @@ for profile in ['controller', 'screensaver']:
         names = z.namelist()
         assert 'manifest' in names and 'source/Main.brs' in names
         assert 'images/icon-hd.png' in names and 'images/splash-hd.png' in names
+        assert 'source/Memory.brs' in names
+        memory = z.read('source/Memory.brs').decode()
+        for method in ['GetChannelMemoryLimit', 'EnableLowGeneralMemoryEvent', 'EnableMemoryWarningEvent', 'GetMemoryLimitPercent', 'GetChannelAvailableMemory']:
+            assert method + '(' in memory, 'Missing memory API: ' + method
         assert 'source/Model.brs' in names and 'components/BridgeTask.brs' in names
         assert not any(n.startswith('../') or 'node_modules' in n or 'tests/' in n for n in names)
         entry = z.read('source/Main.brs').decode()

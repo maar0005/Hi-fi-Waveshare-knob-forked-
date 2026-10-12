@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="ArtScene" extends="Scene">
   <interface>
+    <field id="memoryPressure" type="boolean" value="false" onChange="onMemoryPressure" />
     <field id="profile" type="string" value="screensaver" />
     <field id="settings" type="assocarray" onChange="configure" />
     <field id="done" type="boolean" value="false" />

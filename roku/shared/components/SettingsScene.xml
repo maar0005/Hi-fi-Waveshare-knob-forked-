@@ -8,6 +8,7 @@
   </interface>
   <script type="text/brightscript" uri="pkg:/source/Model.brs" />
   <script type="text/brightscript" uri="pkg:/source/Settings.brs" />
+  <script type="text/brightscript" uri="pkg:/source/Memory.brs" />
   <script type="text/brightscript" uri="pkg:/components/SettingsScene.brs" />
   <children>
     <Rectangle width="1920" height="1080" color="0x101012FF" />

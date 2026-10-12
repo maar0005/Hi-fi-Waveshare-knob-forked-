@@ -18,6 +18,8 @@ sub RunHiPhi(sceneName as string, profile as string)
     scene.profile = profile
     scene.settings = LoadSettings(profile)
     scene.ObserveField("done", port)
+    memory = StartMemoryMonitoring(port)
+    UpdateMemoryPressure(memory, scene)
     screen.Show()
     if sceneName = "SettingsScene"
         if scene.dialog = invalid
@@ -31,7 +33,10 @@ sub RunHiPhi(sceneName as string, profile as string)
         scene.SetFocus(true)
     end if
     while true
-        msg = Wait(0, port)
+        msg = Wait(5000, port)
+        if msg = invalid or type(msg) = "roAppMemoryNotificationEvent" or type(msg) = "roDeviceInfoEvent"
+            UpdateMemoryPressure(memory, scene)
+        end if
         if type(msg) = "roSGScreenEvent"
             if msg.IsScreenClosed() then exit while
         else if type(msg) = "roSGNodeEvent"

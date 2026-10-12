@@ -33,6 +33,16 @@ sub Main()
     check(m.retiring.artIdentity = "old" and m.artFade.control = "start" and m.shown.visible, "same-room ready art fades over previous cover without blanking")
     clearArt()
     check(m.retiring = invalid and m.shown = invalid and m.artFade.control = "stop", "room clear interrupts transition and releases both covers immediately")
+    m.top = {memoryPressure: true}
+    m.loading = {artIdentity: "pending"}
+    m.shown = {artIdentity: "current"}
+    m.retiring = {artIdentity: "outgoing"}
+    onMemoryPressure()
+    check(m.lowMemory and m.loading = invalid and m.retiring = invalid and m.shown <> invalid, "memory pressure releases extra textures while retaining current art")
+    check(m.artKey = "", "cancelled load is retried instead of remaining stuck")
+    m.top.memoryPressure = false
+    onMemoryPressure()
+    check(not m.lowMemory and m.shown <> invalid, "memory recovery restores quality without discarding displayed cover")
     if m.failures = 0 then print "PASS all artwork tests: "; m.count
 end sub
 

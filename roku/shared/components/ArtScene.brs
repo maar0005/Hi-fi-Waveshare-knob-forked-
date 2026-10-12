@@ -4,6 +4,7 @@ end sub
 
 sub artInit(readonly as boolean)
     m.readonly = readonly
+    m.lowMemory = false
     m.top.backgroundColor = "0x101012FF"
     m.layer = m.top.FindNode("artLayer")
     m.strip = m.top.FindNode("strip")
@@ -94,6 +95,12 @@ sub loadArt(state as object)
     poster.height = m.viewport.height
     poster.loadWidth = m.viewport.width
     poster.loadHeight = m.viewport.height
+    if m.lowMemory
+        poster.loadWidth = Int(m.viewport.width / 2)
+        poster.loadHeight = Int(m.viewport.height / 2)
+        if m.shown <> invalid then m.layer.RemoveChild(m.shown)
+        m.shown = invalid
+    end if
     ' Server already composed the crop. Fit preserves it without another zoom.
     poster.loadDisplayMode = "scaleToFit"
     poster.visible = false
@@ -151,4 +158,16 @@ sub finishArtFade()
     if m.retiring <> invalid then m.layer.RemoveChild(m.retiring)
     m.retiring = invalid
     if m.shown <> invalid then m.shown.opacity = 1
+end sub
+
+sub onMemoryPressure()
+    m.lowMemory = m.top.memoryPressure
+    if not m.lowMemory then return
+    ' Release transition and pending textures while preserving the current cover.
+    settleArt()
+    if m.loading <> invalid
+        m.layer.RemoveChild(m.loading)
+        m.loading = invalid
+        m.artKey = ""
+    end if
 end sub
