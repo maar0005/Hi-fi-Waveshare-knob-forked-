@@ -20,3 +20,5 @@ atom_app/managed_components/*
 rlcd_app/managed_components/*
 .claude/
 .oh/.cache/
+
+halo_app/managed_components/*

@@ -376,7 +376,12 @@ static void test_typed_mutations_preserve_unowned_fields(void) {
     assert(controller_config_promote_wifi(1, &committed) ==
            CONTROLLER_CONFIG_COMMITTED_VERIFIED);
     assert(strcmp(committed.value.wifi[0].ssid, "home") == 0);
-    assert(controller_config_remove_wifi(1, &committed) ==
+    assert(controller_config_promote_wifi_named("office", &committed) == CONTROLLER_CONFIG_COMMITTED_VERIFIED);
+    assert(strcmp(committed.value.wifi[0].ssid, "office") == 0);
+    assert(controller_config_remove_wifi_named("missing", &committed) == CONTROLLER_CONFIG_NOT_COMMITTED);
+    assert(current_snapshot().revision == committed.revision);
+    /* The displayed name still selects office after the list has reordered. */
+    assert(controller_config_remove_wifi_named("office", &committed) ==
            CONTROLLER_CONFIG_COMMITTED_VERIFIED);
     assert(committed.value.wifi_count == 1);
     assert(strcmp(committed.value.bridge_base, original.bridge_base) == 0);
@@ -403,7 +408,7 @@ static void test_typed_mutations_preserve_unowned_fields(void) {
     assert(strcmp(committed.value.config_sha, "cafebabe") == 0);
     assert(strcmp(committed.value.ssid, "home") == 0);
     assert(strcmp(committed.value.zone_id, "zone-new") == 0);
-    assert(committed.revision == 8);
+    assert(committed.revision == 9);
 
     controller_remote_preferences_t partial = {
         .present = CONTROLLER_REMOTE_PREFERENCE_CONFIG_SHA,
@@ -414,7 +419,7 @@ static void test_typed_mutations_preserve_unowned_fields(void) {
     assert(strcmp(committed.value.config_sha, "facefeed") == 0);
     assert(strcmp(committed.value.knob_name, "Remote Name") == 0);
     assert(committed.value.rotation_charging == 180);
-    assert(committed.revision == 9);
+    assert(committed.revision == 10);
 
     controller_config_wifi_snapshot_t wifi;
     assert(controller_config_wifi_snapshot(&wifi));

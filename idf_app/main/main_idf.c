@@ -13,6 +13,7 @@
 #include "bridge_client.h"
 #include "controller_config.h"
 #include "ui.h"
+#include "controller_touch_navigation.h"
 #include "ui_network.h"
 #include "wifi_manager.h"
 
@@ -33,9 +34,10 @@
 
 static const char *TAG = "main";
 
-// Hardware telemetry with the full network/configuration path reached 13.1 KiB.
-// 16 KiB fits after the Dial's LVGL DMA buffers while retaining measured margin.
-#define UI_LOOP_STACK_SIZE (16 * 1024)
+// Shared navigation adds a 3,328-byte process frame and 9,728-byte render
+// frame before LVGL/runtime callees. Retain 32 KiB for these nested paths;
+// exact-artifact hardware high-water evidence is still required.
+#define UI_LOOP_STACK_SIZE (32 * 1024)
 #define UI_LOOP_CORE 1
 #define LVGL_PSRAM_POOL_SIZE (72 * 1024)
 #define EXPERIMENT_ENCODER_GPIO_A GPIO_NUM_8
@@ -343,6 +345,7 @@ static void ui_loop_task(void *arg) {
 
         // Run LVGL task handler
         ui_loop_iter();
+        controller_touch_navigation_process();
 
         // Check OTA status periodically (every 500ms = 50 iterations at 10ms)
         if (++ota_check_counter >= 50) {

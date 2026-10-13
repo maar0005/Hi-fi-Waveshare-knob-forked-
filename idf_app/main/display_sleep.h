@@ -63,6 +63,7 @@ void display_sleep_init(esp_lcd_panel_handle_t panel_handle,
  * @brief Enter art mode - hide controls, keep full brightness
  */
 void display_art_mode(void);
+void display_set_user_brightness(int percent);
 
 /**
  * @brief Dim the display backlight

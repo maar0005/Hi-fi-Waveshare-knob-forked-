@@ -40,10 +40,23 @@ jobs:
       - name: Install runtime test dependency
         run: sudo apt-get update -qq && sudo apt-get install -y libcjson-dev
 
+      - name: Test HALO native touch UI
+        run: |
+          git clone --quiet --depth 1 --branch v9.5.0 https://github.com/lvgl/lvgl.git /tmp/halo-test-lvgl
+          test "$(git -C /tmp/halo-test-lvgl rev-parse HEAD)" = 85aa60d18b3d5e5588d7b247abf90198f07c8a63
+          cmake -S tests/halo_native -B /tmp/halo-native-build -DLVGL_SOURCE=/tmp/halo-test-lvgl -DHALO_SANITIZE=ON
+          cmake --build /tmp/halo-native-build -j2
+          /tmp/halo-native-build/halo_native_checks
+          /tmp/halo-native-build/dial_native_checks
+
       - name: Test shared configuration contracts
         run: |
           cc -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Icommon tests/test_controller_connection.c common/controller_connection.c -o /tmp/test-controller-connection
           /tmp/test-controller-connection
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -I/usr/include/cjson tests/test_controller_library.c common/controller_library.c -lcjson -o /tmp/test-controller-library
+          /tmp/test-controller-library
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/test_controller_navigation.c common/controller_navigation.c -o /tmp/test-controller-navigation
+          /tmp/test-controller-navigation
           scripts/test_connection_runtime.sh
           python3 tests/test_firmware_stack_audit.py
           python3 tests/test_firmware_site_assets.py

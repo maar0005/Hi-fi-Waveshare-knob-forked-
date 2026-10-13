@@ -1,4 +1,5 @@
 #include "platform_display_idf.h"
+#include "controller_touch_contact.h"
 #include "platform/platform_power.h"
 #include "platform/platform_display.h"
 #include "display_sleep.h"
@@ -26,24 +27,7 @@
 
 static const char *TAG = "display";
 
-// Swipe gesture detection
-#define SWIPE_MIN_DISTANCE 60   // Minimum pixels for swipe
-#define SWIPE_MAX_TIME_MS 500   // Maximum time for swipe gesture
-static int16_t s_touch_start_x = 0;
-static int16_t s_touch_start_y = 0;
-static int64_t s_touch_start_time = 0;
-static bool s_touch_tracking = false;
-static volatile bool s_pending_art_mode = false;   // Deferred art mode activation
-static volatile bool s_pending_exit_art_mode = false;  // Deferred art mode exit
-static uint16_t s_current_rotation = 0;  // Track rotation for swipe direction transform
-
-// Double-tap detection for art mode toggle
-#define DOUBLE_TAP_MAX_MS 400      // Max time between taps
-#define DOUBLE_TAP_MAX_DISTANCE 40 // Max movement between taps
-static int64_t s_last_tap_time = 0;
-static int16_t s_last_tap_x = 0;
-static int16_t s_last_tap_y = 0;
-
+static controller_touch_contact_t s_touch_contact;
 // LVGL tick timer (critical for LVGL to know time is passing)
 static esp_timer_handle_t s_lvgl_tick_timer = NULL;
 #define LVGL_TICK_PERIOD_MS 2
@@ -349,110 +333,22 @@ static void lvgl_tick_timer_cb(void *arg) {
     lv_tick_inc(LVGL_TICK_PERIOD_MS);
 }
 
-// LVGL touch read callback with swipe gesture detection
+// Feed real pointer movement to LVGL. LVGL rotates coordinates exactly once.
 static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
     uint16_t x, y;
-
-    if (tpGetCoordinates(&x, &y)) {
+    bool down = tpGetCoordinates(&x, &y);
+    bool pressed = false;
+    if (down) {
         display_state_t state = display_get_state();
-        bool was_not_normal = (state != DISPLAY_STATE_NORMAL);
-
-        // Always track touch for swipe detection (even during wake)
-        if (!s_touch_tracking) {
-            s_touch_start_x = x;
-            s_touch_start_y = y;
-            s_touch_start_time = esp_timer_get_time() / 1000;  // Convert to ms
-            s_touch_tracking = true;
-        }
-
-        // Wake display if needed
-        if (was_not_normal) {
-            display_activity_detected();  // Wake display
-            // Consume this touch - don't pass to LVGL widgets (prevents accidental activation)
-            data->point.x = x;
-            data->point.y = y;
-            data->state = LV_INDEV_STATE_RELEASED;
-            return;  // Swipe tracking continues, but widget interaction suppressed
-        }
-
-        // Display already awake - check if touches suppressed after recent wake
-        if (display_is_touch_suppressed()) {
-            // Within 250ms after wake - suppress widget touches but track for swipes
-            data->point.x = x;  // Update coordinates for swipe detection
-            data->point.y = y;
-            data->state = LV_INDEV_STATE_RELEASED;
-            return;
-        }
-
-        // Normal touch processing
-        display_activity_detected();  // Reset sleep timers
-        data->point.x = x;
-        data->point.y = y;
-        data->state = LV_INDEV_STATE_PRESSED;
-    } else {
-        data->state = LV_INDEV_STATE_RELEASED;
-
-        // Check for swipe gesture on release
-        if (s_touch_tracking) {
-            int64_t elapsed = (esp_timer_get_time() / 1000) - s_touch_start_time;
-            int64_t now_ms = esp_timer_get_time() / 1000;
-
-            if (elapsed < SWIPE_MAX_TIME_MS) {
-                int16_t dx = data->point.x - s_touch_start_x;
-                int16_t dy = data->point.y - s_touch_start_y;
-
-                // Transform swipe direction for 180° rotation (#43)
-                // When rotated 180°, user's "swipe up" produces positive raw dy
-                if (s_current_rotation == 180) {
-                    dy = -dy;
-                    dx = -dx;
-                }
-
-                // Check for swipe up (negative Y direction) - enter art mode
-                if (dy < -SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-                    // Only allow art mode when WiFi is configured and bridge is responding with zones
-                    if (bridge_client_is_ready_for_art_mode()) {
-                        ESP_LOGI(TAG, "Swipe up detected (rotation=%d) - queueing art mode", s_current_rotation);
-                        s_pending_art_mode = true;  // Defer to avoid LVGL threading issues
-                    } else {
-                        ESP_LOGI(TAG, "Swipe up ignored - not ready for art mode (no zones)");
-                    }
-                }
-                // Check for swipe down (positive Y direction) - exit art mode
-                else if (dy > SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-                    ESP_LOGI(TAG, "Swipe down detected (rotation=%d) - queueing exit art mode", s_current_rotation);
-                    s_pending_exit_art_mode = true;  // Defer to avoid LVGL threading issues
-                }
-                // Check for double-tap to enter art mode (#66)
-                // Only if this wasn't a swipe (small movement) and not already in art mode
-                // (any single tap exits art mode, so double-tap is only for entering)
-                else if (display_get_state() != DISPLAY_STATE_ART_MODE &&
-                         abs(dx) < DOUBLE_TAP_MAX_DISTANCE && abs(dy) < DOUBLE_TAP_MAX_DISTANCE) {
-                    int64_t tap_interval = now_ms - s_last_tap_time;
-                    int16_t tap_dx = abs(data->point.x - s_last_tap_x);
-                    int16_t tap_dy = abs(data->point.y - s_last_tap_y);
-
-                    if (tap_interval < DOUBLE_TAP_MAX_MS &&
-                        tap_dx < DOUBLE_TAP_MAX_DISTANCE &&
-                        tap_dy < DOUBLE_TAP_MAX_DISTANCE) {
-                        // Double-tap detected - enter art mode
-                        if (bridge_client_is_ready_for_art_mode()) {
-                            ESP_LOGI(TAG, "Double-tap detected - entering art mode");
-                            s_pending_art_mode = true;
-                        }
-                        s_last_tap_time = 0;  // Reset to prevent triple-tap
-                    } else {
-                        // First tap or tap too far from previous - record it
-                        s_last_tap_time = now_ms;
-                        s_last_tap_x = data->point.x;
-                        s_last_tap_y = data->point.y;
-                    }
-                }
-            }
-            s_touch_tracking = false;
-        }
-    }
+        bool asleep = state == DISPLAY_STATE_DIM || state == DISPLAY_STATE_SLEEP;
+        display_activity_detected();
+        pressed = controller_touch_contact_feed(&s_touch_contact, true, (int16_t)x, (int16_t)y,
+                                                asleep, display_is_touch_suppressed());
+    } else controller_touch_contact_feed(&s_touch_contact, false, 0, 0, false, false);
+    data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    data->point.x = s_touch_contact.x;
+    data->point.y = s_touch_contact.y;
 }
 
 bool platform_display_init(void) {
@@ -643,20 +539,6 @@ bool platform_display_is_sleeping(void) {
 }
 
 void platform_display_process_pending(void) {
-    // Process deferred swipe gesture art mode
-    if (s_pending_art_mode) {
-        s_pending_art_mode = false;
-        display_art_mode();
-    }
-    // Process deferred exit art mode (swipe down)
-    if (s_pending_exit_art_mode) {
-        s_pending_exit_art_mode = false;
-        // Only exit if in art mode - use display_wake which handles state properly
-        if (display_get_state() == DISPLAY_STATE_ART_MODE) {
-            display_wake();  // Returns to normal state with controls visible
-        }
-    }
-    // Process deferred timer-triggered state changes
     display_process_pending();
 }
 
@@ -671,16 +553,16 @@ void platform_display_set_rotation(uint16_t degrees) {
     lv_display_rotation_t rotation;
     if (degrees == 180) {
         rotation = LV_DISPLAY_ROTATION_180;
-        s_current_rotation = 180;
+
     } else {
         if (degrees != 0) {
             ESP_LOGW(TAG, "Rotation %d not supported (only 0/180), using 0", degrees);
         }
         rotation = LV_DISPLAY_ROTATION_0;
-        s_current_rotation = 0;
+
     }
 
-    ESP_LOGI(TAG, "Setting display rotation to %d degrees", s_current_rotation);
+    ESP_LOGI(TAG, "Setting display rotation to %d degrees", rotation == LV_DISPLAY_ROTATION_180 ? 180 : 0);
     lv_display_set_rotation(s_display, rotation);
 }
 
