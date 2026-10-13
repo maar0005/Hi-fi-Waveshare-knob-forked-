@@ -1,6 +1,7 @@
 /* Exercise production HALO widgets with real LVGL pointer/scroll processing.
  * Only hardware/network/RTOS boundaries are substituted. No music is played. */
-#include "../../halo_app/main/halo_navigation.c"
+#include "../../common/controller_touch_navigation.c"
+#include "controller_touch_contact.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,12 +99,32 @@ bool wifi_mgr_get_ip(char *out, size_t n) {
   return fixture_has_ip;
 }
 extern const lv_font_t lato_22, notosans_28;
-const lv_font_t *font_manager_get_small(void) { return &lato_22; }
-const lv_font_t *font_manager_get_normal(void) { return &notosans_28; }
+const lv_font_t *platform_touch_font_small(void) { return &lato_22; }
+const lv_font_t *platform_touch_font_normal(void) { return &notosans_28; }
+static bool device_controls_visible;
+static int device_scroll_delta;
+const char *platform_product_name(void) {
+#ifdef TEST_DIAL_TOUCH
+  return "HiPhi Dial";
+#else
+  return "HiPhi HALO";
+#endif
+}
+void platform_touch_screen_changed(controller_screen_t screen) { (void)screen;device_controls_visible=false; }
+bool platform_touch_has_device_controls(void) {
+#ifdef TEST_DIAL_TOUCH
+  return true;
+#else
+  return false;
+#endif
+}
+void platform_touch_show_device_controls(void) { device_controls_visible=true; }
+bool platform_touch_device_controls_visible(void) { return device_controls_visible; }
+void platform_touch_scroll_device_controls(int delta) { device_scroll_delta+=delta; }
 static int saved_brightness = 100, brightness_saves;
-void platform_display_set_brightness(int percent) { (void)percent; }
-int platform_display_load_brightness(void) { return saved_brightness; }
-bool platform_display_save_brightness(int percent) { saved_brightness = percent; brightness_saves++; return true; }
+void platform_touch_set_brightness(int percent) { (void)percent; }
+int platform_touch_load_brightness(void) { return saved_brightness; }
+bool platform_touch_save_brightness(int percent) { saved_brightness = percent; brightness_saves++; return true; }
 
 bool wifi_mgr_is_ap_mode(void) { return fixture_ap; }
 bool wifi_mgr_start_provisioning(void) { fixture_ap = true; return true; }
@@ -179,6 +200,7 @@ static void click(lv_obj_t *obj) {
   lv_area_t area;
   lv_obj_get_coords(obj, &area);
   int x = (area.x1 + area.x2) / 2, y = (area.y1 + area.y2) / 2;
+  if (lv_display_get_rotation(lv_display_get_default()) == LV_DISPLAY_ROTATION_180) { x=359-x;y=359-y; }
   input(x, y, true, 80);
   input(x, y, false, 80);
 }
@@ -269,11 +291,11 @@ int main(int argc, char **argv) {
   assert(brightness == 100);
   assert(lv_obj_get_scroll_y(scroller) > 0);
   setting_index = 0;
-  halo_navigation_encoder(3);
+  controller_touch_navigation_encoder(3);
   advance(300);
   assert(setting_index == 3);
   change_screen(CONTROLLER_SCREEN_ZONES);
-  halo_navigation_encoder(63);
+  controller_touch_navigation_encoder(63);
   advance(400);
   assert(zone_index == 63);
   assert(lv_obj_get_scroll_y(scroller) > 0);
@@ -293,7 +315,7 @@ int main(int argc, char **argv) {
   render();
   advance(300);
   snapshot(dir, "albums");
-  halo_navigation_encoder(3);
+  controller_touch_navigation_encoder(3);
   advance(500);
   assert(selected_index == 3);
   input(180, 175, true, 60);
@@ -313,7 +335,7 @@ int main(int argc, char **argv) {
   assert(pending_mutation == PLAY);
   int played = selected_index;
   busy = false;
-  halo_navigation_process();
+  controller_touch_navigation_process();
   request_t request;
   assert(xQueueReceive(requests, &request, 0));
   assert(request.kind == PLAY);
@@ -338,7 +360,7 @@ int main(int argc, char **argv) {
   assert(pending_mutation == PLAY);
   change_screen(CONTROLLER_SCREEN_SETTINGS);
   busy = false;
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(!xQueueReceive(requests, &request, 0));
   /* Back from a leaf's action chooser also cancels, not only top-level Home. */
   screen = CONTROLLER_SCREEN_LIBRARY;
@@ -351,7 +373,7 @@ int main(int argc, char **argv) {
   click(back);
   assert(!chooser && pending_mutation == -1);
   busy = false;
-  halo_navigation_process();
+  controller_touch_navigation_process();
   if (xQueueReceive(requests, &request, 0))
     assert(request.kind == IMAGE);
   /* A stale image result never attaches pixels to the new page. */
@@ -366,7 +388,7 @@ int main(int argc, char **argv) {
            endpoint);
   snprintf(stale->request.zone, sizeof(stale->request.zone), "%s", zone);
   assert(xQueueSend(results, &stale, 0));
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(!covers[0].pixels);
   xQueueReceive(requests, &request, 0);
   busy = false;
@@ -376,8 +398,8 @@ int main(int argc, char **argv) {
   selected_index = 11;
   offset = 0;
   pending_browse = false;
-  halo_navigation_encoder(3);
-  halo_navigation_process();
+  controller_touch_navigation_encoder(3);
+  controller_touch_navigation_process();
   assert(xQueueReceive(requests, &request, 0));
   assert(request.kind == BROWSE && request.offset == 12);
   result_t *next = calloc(1, sizeof(*next));
@@ -386,7 +408,7 @@ int main(int argc, char **argv) {
   next->page.count = 12;
   next->page.next_offset = -1;
   assert(xQueueSend(results, &next, 0));
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(offset == 12 && selected_index == 2);
   /* Duplicate artwork URLs retain the requested card index, never overwrite
    * the first card's owned pixels. */
@@ -416,7 +438,7 @@ int main(int argc, char **argv) {
            "Wrong room");
   snprintf(fixture_zone, sizeof(fixture_zone), "roon:new-room");
   assert(xQueueSend(results, &old_zone, 0));
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(page->count == 0);
   assert(xQueueReceive(requests, &request, 0));
   assert(!strcmp(request.zone, fixture_zone) && request.kind == BROWSE);
@@ -447,33 +469,33 @@ int main(int argc, char **argv) {
   /* Recovery must be visible without discovering the invisible artwork tap. */
   change_screen(CONTROLLER_SCREEN_ARTWORK);
   fixture_ap = true; fixture_has_ip = false;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(recovery_active && !lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN));
   assert(strstr(lv_label_get_text(detail_label), "192.168.4.1"));
-  assert(halo_navigation_encoder(1));
+  assert(controller_touch_navigation_encoder(1));
   snapshot(dir, "setup");
   fixture_ap = false; fixture_has_ip = false;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(recovery_active && strstr(recovery_text, "Waiting for network"));
   fixture_has_ip = true; fixture_ready = false;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(recovery_active && !strcmp(recovery_title, "Music connection"));
   fixture_ready = true;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(!recovery_active && lv_obj_has_flag(overlay, LV_OBJ_FLAG_HIDDEN));
   assert(artwork_only);
   fixture_durability = CONTROLLER_CONFIG_DURABILITY_VOLATILE_RECOVERY;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(recovery_active && strstr(recovery_title, "storage"));
   fixture_durability = CONTROLLER_CONFIG_DURABILITY_DURABLE;
-  advance(1100); halo_navigation_process();
+  advance(1100); controller_touch_navigation_process();
   assert(!recovery_active);
   change_screen(CONTROLLER_SCREEN_SETTINGS);
   lv_obj_scroll_to_view(rows[1], LV_ANIM_OFF); advance(100); click(rows[1]);
   assert(settings_detail == 1 && strstr(lv_label_get_text(detail_label), "Connected to music bridge"));
   click(primary);
   assert(connection_refresh_pending);
-  advance(5100); halo_navigation_process();
+  advance(5100); controller_touch_navigation_process();
   assert(!connection_refresh_pending && !strcmp(settings_notice, "Refresh timed out"));
   snapshot(dir, "connection");
   click(back);
@@ -508,17 +530,17 @@ int main(int argc, char **argv) {
   assert(settings_detail == 6 && forgotten_networks == 1);
   click(back);
   brightness = 42; brightness_dirty = true; brightness_changed_ms = now;
-  advance(600); halo_navigation_process();
+  advance(600); controller_touch_navigation_process();
   assert(brightness_saves == 0);
-  advance(200); halo_navigation_process();
-  assert(brightness_saves == 1 && platform_display_load_brightness() == 42);
+  advance(200); controller_touch_navigation_process();
+  assert(brightness_saves == 1 && platform_touch_load_brightness() == 42);
   /* A page containing only unsupported folders advances to the provider's
    * offset instead of showing an empty/retry page or repeating offset zero. */
   while (xQueueReceive(requests, &request, 0)) {}
   busy = false;
   change_screen(CONTROLLER_SCREEN_LIBRARY);
   offset = 0; selected_index = 0;
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(xQueueReceive(requests, &request, 0));
   assert(request.kind == BROWSE && request.offset == 0);
   result_t *search_only = calloc(1, sizeof(*search_only));
@@ -527,11 +549,39 @@ int main(int argc, char **argv) {
   snprintf(search_only->page.items[0].title, sizeof(search_only->page.items[0].title), "Search");
   snprintf(search_only->page.items[0].location, sizeof(search_only->page.items[0].location), "opaque-search");
   assert(xQueueSend(results, &search_only, 0));
-  halo_navigation_process();
+  controller_touch_navigation_process();
   assert(page->count == 0 && offset == 12);
   assert(xQueueReceive(requests, &request, 0));
   assert(request.kind == BROWSE && request.offset == 12);
   change_screen(CONTROLLER_SCREEN_ARTWORK);
+  controller_touch_contact_t contact = {0};
+  assert(!controller_touch_contact_feed(&contact, true, 10, 20, true, false));
+  assert(!controller_touch_contact_feed(&contact, true, 30, 40, false, false));
+  assert(contact.x == 30 && contact.y == 40);
+  assert(!controller_touch_contact_feed(&contact, false, 0, 0, false, false));
+  assert(contact.x == 30 && contact.y == 40);
+  assert(controller_touch_contact_feed(&contact, true, 50, 60, false, false));
+  assert(controller_touch_contact_feed(&contact, true, 50, 5, false, false));
+  controller_touch_contact_feed(&contact, false, 0, 0, false, false);
+  assert(!controller_touch_contact_feed(&contact, true, 50, 60, false, true));
+  assert(!controller_touch_contact_feed(&contact, true, 50, 60, false, false));
+  lv_display_set_rotation(d, LV_DISPLAY_ROTATION_180);
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
+  click(art_touch);
+  assert(screen == CONTROLLER_SCREEN_NOW_PLAYING);
+  click(home_button);
+  assert(screen == CONTROLLER_SCREEN_MENU);
+  lv_display_set_rotation(d, LV_DISPLAY_ROTATION_0);
+#ifdef TEST_DIAL_TOUCH
+  change_screen(CONTROLLER_SCREEN_SETTINGS);
+  assert(rows[7]);
+  lv_obj_scroll_to_view(rows[7], LV_ANIM_OFF);advance(100);click(rows[7]);
+  assert(device_controls_visible);
+  assert(controller_touch_navigation_encoder(2));
+  assert(device_scroll_delta==2);
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
+  assert(!device_controls_visible);
+#endif
   lv_mem_monitor_t memory;
   lv_mem_monitor(&memory);
   assert(memory.total_size <= 96 * 1024);

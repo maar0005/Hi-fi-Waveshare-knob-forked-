@@ -3,6 +3,8 @@ set(SRC_FILES
     "halo_ui_headless.c"
     "halo_ui_stubs.c"
     "halo_navigation.c"
+    "platform_touch_navigation_halo.c"
+    "../../common/controller_touch_navigation.c"
     "../../common/controller_library.c"
     "../../common/controller_navigation.c"
     "../../idf_app/main/controller_input_profile_dial.c"

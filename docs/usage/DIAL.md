@@ -30,7 +30,15 @@ Dial Settings and the web configuration page share the same connection status: s
 
 Existing discovered IP-only settings can adopt a bridge name while that IP still matches its mDNS advertisement. An already-obsolete IP with no stored name cannot safely identify its former bridge; set its URL once rather than guessing another installation. Manual URLs are preserved. See [connection recovery](../connection-recovery.md) for behavior and validation.
 
-## Controls
+## Touch/library preview (PR #278)
+
+The preview shares its round-screen navigation with HALO. Artwork has no buttons, text or rings. Tap it to reveal Now playing and Menu; tap the Now playing background to return to artwork. Transport buttons keep their own actions. Menu opens Library, Zones and Settings.
+
+Turn the knob for volume on Artwork/Now playing. In Library, Zones and Settings it browses or scrolls visible content. Lists scroll vertically with touch; album covers form a horizontal carousel. Back preserves collection selection, and Play/Queue are deliberate actions. Search folders are excluded. Settings includes connection details, Wi-Fi/bridge editing, saved networks, About, saved brightness and confirmed reset. Device controls retains update checks and BLE status. Battery, rotation, dim/sleep and wake suppression remain target-owned; artwork is an awake surface, and the contact that wakes a sleeping panel is consumed until release.
+
+The stable controls below describe firmware before this preview.
+
+## Stable controls
 
 | Action | What it does |
 |--------|--------------|
