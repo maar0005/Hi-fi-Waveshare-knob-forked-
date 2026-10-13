@@ -108,7 +108,7 @@ jobs:
         run: |
           PREVIEW_URL="https://firmware.hiphi.audio/pr/${PR_NUM}/site/flash-frame.html"
           for attempt in $(seq 1 60); do
-            if curl --fail --silent --location "$PREVIEW_URL" --output deployed.html; then
+            if curl --fail --silent --location --max-time 30 -H "Cache-Control: no-cache" "$PREVIEW_URL" --output deployed.html && cmp --silent site-preview/flash-frame.html deployed.html; then
               break
             fi
             test "$attempt" -lt 60
@@ -119,6 +119,7 @@ jobs:
             asset="${source#site-preview/}"
             mkdir -p "deployed-site/$(dirname "${asset}")"
             curl --fail --silent --show-error --location \
+              -H "Cache-Control: no-cache" --max-time 30 \
               --retry 24 --retry-all-errors --retry-delay 5 \
               "https://firmware.hiphi.audio/pr/${PR_NUM}/site/${asset}" \
               --output "deployed-site/${asset}"
