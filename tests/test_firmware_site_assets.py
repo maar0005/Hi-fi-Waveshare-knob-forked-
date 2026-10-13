@@ -110,6 +110,31 @@ class AssetVersioningTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             comparison(source.replace('## Requires UHC v4', '## Other'), '2.8.0-alpha.1')
 
+    def test_preview_waits_for_matching_bytes_not_just_http_200(self):
+        import os
+        import subprocess
+        import textwrap
+        workflow = (ROOT / '.github/workflows/firmware-site-preview.yml').read_text()
+        start = workflow.index('          PREVIEW_URL=')
+        end = workflow.index('          while IFS=', start)
+        check = textwrap.dedent(workflow[start:end])
+        for fresh_after in (2, 100):
+            with self.subTest(fresh_after=fresh_after), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / 'site-preview').mkdir()
+                (root / 'site-preview/flash-frame.html').write_text('current')
+                mock = root / 'bin'
+                mock.mkdir()
+                (mock / 'curl').write_text("#!/bin/sh\nn=$(cat count 2>/dev/null || echo 0)\nn=$((n+1))\necho $n > count\nif [ $n -ge $FRESH_AFTER ]; then printf current > deployed.html; else printf stale > deployed.html; fi\n")
+                (mock / 'sleep').write_text('#!/bin/sh\nexit 0\n')
+                for file in mock.iterdir():
+                    file.chmod(0o755)
+                env = dict(os.environ, PATH=str(mock)+os.pathsep+os.environ['PATH'], FRESH_AFTER=str(fresh_after), PR_NUM='1')
+                result = subprocess.run(['bash', '-e', '-c', check], cwd=root, env=env, capture_output=True)
+                self.assertEqual(result.returncode == 0, fresh_after == 2)
+                if fresh_after == 2:
+                    self.assertEqual((root / 'count').read_text().strip(), '2')
+
     def test_missing_asset_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(FileNotFoundError):
