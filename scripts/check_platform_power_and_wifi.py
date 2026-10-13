@@ -308,11 +308,11 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         '"../../common/wifi_portal_form.c"',
     ),
     ".github/RELEASE_TEMPLATE.md": (
-        "All nine physical controllers now scan for nearby 2.4 GHz",
+        "All ten physical controllers now scan for nearby 2.4 GHz",
         "one shared power snapshot now supplies",
         "Every physical controller exposes `/power-debug`",
         "The Dial's `/power-debug/sleep` endpoint now runs one persistent power",
-        "All nine controllers retain the terminal-power evidence",
+        "All ten controllers retain the terminal-power evidence",
         "could therefore\nkeep the processor awake indefinitely",
         "HiPhi RLCD now sleeps the panel and processor",
     ),
