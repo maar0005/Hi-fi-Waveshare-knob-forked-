@@ -40,6 +40,24 @@ class AssetVersioningTests(unittest.TestCase):
             assets.version_assets(root)
             self.assertEqual((root / "index.html").read_text(), second)
 
+    def test_release_landing_page_verifies_rendered_asset_urls(self):
+        import subprocess
+        import shutil
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            shutil.copytree(ROOT / 'web/assets', root / 'assets')
+            shutil.copyfile(ROOT / 'web/index.html', root / 'index.html')
+            assets.version_assets(root)
+            deployed = root / 'deployed.html'
+            shutil.copyfile(root / 'index.html', deployed)
+            workflow = (ROOT / '.github/workflows/docker.yml').read_text()
+            comparison = re.search(r'cmp ([^\n]+) deployed-release/firmware-center.html', workflow)[1]
+            expected = root / 'index.html' if comparison == 'publish-root/index.html' else ROOT / comparison
+            self.assertEqual(subprocess.run(['cmp', str(expected), str(deployed)], capture_output=True).returncode, 0)
+            # Raw source is deliberately different after rendering. This fails
+            # the old workflow comparison even though the deployment is right.
+            self.assertNotEqual((ROOT / 'web/index.html').read_bytes(), deployed.read_bytes())
+
     def test_missing_asset_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(FileNotFoundError):
