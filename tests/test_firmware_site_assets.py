@@ -5,9 +5,11 @@ import importlib.util
 from pathlib import Path
 import re
 import tempfile
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("assets", ROOT / "scripts/version_firmware_site_assets.py")
 assets = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assets)
@@ -58,6 +60,56 @@ class AssetVersioningTests(unittest.TestCase):
             # the old workflow comparison even though the deployment is right.
             self.assertNotEqual((ROOT / 'web/index.html').read_bytes(), deployed.read_bytes())
 
+    def comparison_fixture(self, root, channel="alpha", version="2.8.0-alpha.1"):
+        (root / 'assets').mkdir()
+        for name in ('styles.css', 'site.js'):
+            (root / 'assets' / name).write_text('asset')
+        (root / 'assets/alpha-changelog.md').write_text((ROOT / 'web/assets/alpha-changelog.md').read_text())
+        template = f'<body data-channel="{channel}"><p class="context-line">Alpha / v{version}</p><!-- alpha-comparison:start --><!-- alpha-comparison:end --></body>'
+        (root / 'index.html').write_text(template)
+        return template
+
+    def test_alpha_comparison_is_static_safe_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.comparison_fixture(root)
+            assets.prepare_site(root)
+            text = (root / 'index.html').read_text()
+            self.assertIn('Requires UHC v4', text)
+            self.assertIn('Stable v2.5.2', text)
+            self.assertIn('Library', text)
+            self.assertIn('v4.0.0-beta.4', text)
+            self.assertNotIn('**Dial', text)
+            assets.prepare_site(root)
+            self.assertEqual(text, (root / 'index.html').read_text())
+
+    def test_stable_beta_and_unreleased_previews_do_not_borrow_alpha_claims(self):
+        for channel, version in [('stable', '2.5.2'), ('beta', '2.8.0-beta.1'), ('alpha', 'pr-123'), ('alpha', '2.8.0-alpha.1-dev')]:
+            with self.subTest(channel=channel, version=version), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.comparison_fixture(root, channel, version)
+                (root / 'assets/alpha-changelog.md').unlink()
+                assets.prepare_site(root)
+                self.assertNotIn('Requires UHC', (root / 'index.html').read_text())
+
+    def test_stale_notes_fail_before_any_page_is_modified(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            original = self.comparison_fixture(root)
+            (root / 'next.html').write_text(original.replace('v2.8.0-alpha.1', 'v2.8.0-alpha.2'))
+            with self.assertRaisesRegex(ValueError, 'Update alpha-changelog'):
+                assets.prepare_site(root)
+            self.assertEqual(original, (root / 'index.html').read_text())
+
+    def test_notes_escape_html_and_reject_incomplete_metadata(self):
+        from render_firmware_site_preview import comparison
+        source = (ROOT / 'web/assets/alpha-changelog.md').read_text()
+        rendered = comparison(source.replace('artwork-only', '<script>bad()</script>'), '2.8.0-alpha.1')
+        self.assertNotIn('<script>', rendered)
+        self.assertIn('&lt;script&gt;', rendered)
+        with self.assertRaises(ValueError):
+            comparison(source.replace('## Requires UHC v4', '## Other'), '2.8.0-alpha.1')
+
     def test_missing_asset_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(FileNotFoundError):
@@ -68,7 +120,7 @@ class AssetVersioningTests(unittest.TestCase):
         for directory in ('pr-preview', 'gh-pages-build', 'publish-root'):
             self.assertIn(f'python3 scripts/version_firmware_site_assets.py {directory}', workflow)
         self.assertIn('find pr-preview -type f', workflow)
-        self.assertIn('version_assets(output)', (ROOT / 'scripts/render_firmware_site_preview.py').read_text())
+        self.assertIn('prepare_site(output)', (ROOT / 'scripts/render_firmware_site_preview.py').read_text())
 
 
 if __name__ == '__main__':

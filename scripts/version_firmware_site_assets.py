@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Give generated firmware pages content-addressed CSS/JS URLs."""
+"""Prepare reviewed page content and content-addressed CSS/JS URLs."""
 
 from __future__ import annotations
 
@@ -24,7 +24,13 @@ def version_assets(directory: Path) -> None:
         page.write_text(content, encoding="utf-8")
 
 
+def prepare_site(directory: Path) -> None:
+    from render_firmware_site_preview import render_alpha_comparisons
+    render_alpha_comparisons(directory)
+    version_assets(directory)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
-    version_assets(parser.parse_args().directory)
+    prepare_site(parser.parse_args().directory)

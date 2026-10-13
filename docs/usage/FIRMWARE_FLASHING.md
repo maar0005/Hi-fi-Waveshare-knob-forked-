@@ -194,3 +194,9 @@ esptool.py --chip esp32s3 merge_bin \
 ```
 
 This creates a single file that can be flashed at offset 0, containing all partitions at their correct addresses.
+
+## Maintaining Alpha versus Stable notes
+
+The Alpha flasher shows a comparison and UHC compatibility requirements before its device list. Its source is `web/assets/alpha-changelog.md`, a reviewed Markdown summary of the current alpha against the current Stable release. Update its version heading, UHC recommendation, feature bullets and hardware-testing status as part of each alpha release. An LLM can draft the text from the commits and release notes; a maintainer reviews it before publication.
+
+Site preparation renders this Markdown into static HTML for every released-alpha page and lightweight site preview. Stable, Beta and unreleased firmware previews do not inherit these claims. The alpha version must match the page version; publishing fails before writing pages when notes are stale or incomplete. CSS/JS asset versioning runs after rendering. No LLM call, backend access or client-side changelog fetch is needed to display the comparison.
