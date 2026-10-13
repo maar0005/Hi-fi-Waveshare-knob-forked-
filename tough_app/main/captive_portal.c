@@ -768,6 +768,22 @@ static void add_power_preference(controller_remote_preferences_t *prefs,
 }
 
 static esp_err_t sta_settings_handler(httpd_req_t *req) {
+#ifdef HIPHI_HALO_NATIVE_SETTINGS
+  char *page = heap_caps_calloc(1, 12288, MALLOC_CAP_8BIT);
+  if (!page) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory"); return ESP_FAIL; }
+  snprintf(page, 12288, "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+      "<title>HiPhi HALO Settings</title><style>%s</style></head><body>%s"
+      "<nav><a href='/zones'>Zones</a> <a href='/power-debug'>Diagnostics</a></nav>"
+      "<div class='card'><h2>HALO settings</h2><p>Tap the artwork, then Menu and Settings.</p>"
+      "<p>Brightness, Wi-Fi, the music bridge, saved networks, About and factory reset are available on HALO.</p>"
+      "<p>For phone Wi-Fi setup, choose Wi-Fi then Setup on HALO. Join hiphi-halo-setup and open 192.168.4.1.</p>"
+      "<p>HALO uses an always-on display. Automatic dimming and sleep are unavailable.</p></div>%s</body></html>",
+      STA_CSS, portal_brand_header_html(), portal_brand_footer_html());
+  httpd_resp_set_type(req, "text/html");
+  httpd_resp_send(req, page, HTTPD_RESP_USE_STRLEN);
+  free(page);
+  return ESP_OK;
+#endif
   controller_config_snapshot_t snapshot = {0};
   if (!controller_config_snapshot(&snapshot)) {
     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
@@ -847,6 +863,10 @@ static esp_err_t sta_settings_handler(httpd_req_t *req) {
 }
 
 static esp_err_t sta_settings_save_handler(httpd_req_t *req) {
+#ifdef HIPHI_HALO_NATIVE_SETTINGS
+  httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "HALO display settings are changed on the device");
+  return ESP_FAIL;
+#endif
   char body[1024] = {0};
   int received = httpd_req_recv(req, body, sizeof(body) - 1);
   if (received <= 0) {

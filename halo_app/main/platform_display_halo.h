@@ -8,6 +8,8 @@
 bool platform_display_init(void);                 /* SPI/panel/backlight/I2C/touch hardware; before lv_init() */
 bool platform_display_register_lvgl_driver(void); /* after lv_init(): buffers, flush cb, touch indev, tick timer */
 bool platform_display_is_ready(void);
-void platform_display_process_pending(void);      /* UI loop: deferred art-mode gesture handling */
+void platform_display_process_pending(void);      /* UI loop: deferred screen and library swipe handling */
 void platform_display_set_brightness(int percent);/* 0..100 -> LEDC duty (floor of 5% so it never goes black) */
+int platform_display_load_brightness(void);
+bool platform_display_save_brightness(int percent);
 i2c_master_bus_handle_t platform_display_halo_i2c_bus(void); /* shared port-0 bus (haptic/INA later) */

@@ -55,7 +55,10 @@ static void *s_panel_handle, *s_lvgl_task_handle;
 static void *s_art_mode_timer, *s_dim_timer, *s_sleep_timer, *s_deep_sleep_timer;
 static bool s_debug_sleep_override_armed;
 static void *s_input_queue = (void *)1;
-static int queued_ticks, dispatches;
+static int queued_ticks, dispatches, navigation_calls, restore_calls;
+static bool navigation_consumes;
+static void controller_touch_navigation_restore_visibility(void) { restore_calls++; }
+static bool controller_touch_navigation_encoder(int delta) { assert(delta==3);navigation_calls++;return navigation_consumes; }
 static uint32_t coalesced;
 static int timer_calls, pending_calls, poll_calls;
 static int64_t esp_timer_get_time(void) { return now_ms * 1000; }
@@ -91,7 +94,7 @@ static void poll_pending(void *p) { assert(!p); poll_calls++; }
 '''
 main = r'''
 int main(void) {
-    for (display_state_t state = DISPLAY_STATE_ART_MODE; state <= DISPLAY_STATE_SLEEP; state++) {
+    for (display_state_t state = DISPLAY_STATE_DIM; state <= DISPLAY_STATE_SLEEP; state++) {
         now_ms = 1000;
         s_display_state = state;
         s_panel_handle = (void *)1;
@@ -114,6 +117,23 @@ int main(void) {
         platform_input_process_events();
         assert(dispatches == 2);
     }
+    /* Awake artwork must preserve art and apply the first volume batch. */
+    now_ms = 1800;
+    s_display_state = DISPLAY_STATE_ART_MODE;
+    s_encoder_suppress_until_ms = 0;
+    dispatches = 0; restore_calls = 0;
+    queued_ticks = 3;
+    platform_input_process_events();
+    assert(s_display_state == DISPLAY_STATE_ART_MODE);
+    assert(dispatches == 1 && restore_calls == 0);
+    /* Navigation consumes rotary input before playback volume dispatch. */
+    s_display_state = DISPLAY_STATE_NORMAL;
+    navigation_consumes = true;
+    navigation_calls = 0; dispatches = 0;
+    queued_ticks = 3;
+    platform_input_process_events();
+    assert(navigation_calls == 1 && dispatches == 0);
+    navigation_consumes = false;
     /* The input consumer also retains an already-established deep-wake deadline. */
     s_display_state = DISPLAY_STATE_NORMAL;
     now_ms = 2000;
@@ -128,7 +148,7 @@ int main(void) {
     assert(dispatches == 1);
     ui_loop_iter();
     assert(timer_calls == 1 && pending_calls == 1 && poll_calls == 1);
-    puts("Dial wake consumes initiating batch, resumes at 500ms; UI timer runs once");
+    puts("Dial artwork stays awake; navigation consumes input; panel wake resumes at 500ms; UI timer runs once");
 }
 '''
 functions = "\n".join(function(sleep, name) for name in

@@ -7,6 +7,8 @@
 #include "platform/platform_power.h"
 #include "bridge_client.h"
 #include "ui.h"
+#include "halo_navigation.h"
+#include "controller_navigation.h"
 #include "halo_st77916_init.h"
 
 #include <inttypes.h>
@@ -22,6 +24,7 @@
 #include <esp_lcd_panel_vendor.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <nvs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "lvgl.h"
@@ -67,10 +70,6 @@ static const char *TAG = "display";
 #define BL_MAX_DUTY ((1 << 7) - 1)
 
 /* Gesture thresholds (same semantics as the Dial). */
-#define SWIPE_MIN_DISTANCE 60
-#define SWIPE_MAX_TIME_MS 500
-#define DOUBLE_TAP_MAX_MS 400
-#define DOUBLE_TAP_MAX_DISTANCE 40
 
 static lv_display_t *s_display;
 static lv_indev_t *s_touch_indev;
@@ -84,13 +83,8 @@ static bool s_hardware_ready, s_lvgl_ready;
 static uint16_t s_rotation;
 
 /* Gesture / art-mode state (art mode = controls hidden, artwork only). */
-static int16_t s_start_x, s_start_y, s_last_x, s_last_y;
-static int64_t s_start_ms;
-static bool s_tracking, s_touch_swallowed;
-static int64_t s_last_tap_ms;
-static int16_t s_last_tap_x, s_last_tap_y;
-static bool s_art_mode;
-static volatile bool s_pending_enter_art, s_pending_exit_art;
+static int16_t s_last_x, s_last_y;
+
 
 /* ---------------- backlight ---------------- */
 void platform_display_set_brightness(int percent) {
@@ -99,6 +93,28 @@ void platform_display_set_brightness(int percent) {
     uint32_t duty = (uint32_t)percent * BL_MAX_DUTY / 100;
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+}
+
+int platform_display_load_brightness(void) {
+    nvs_handle_t handle;
+    uint8_t value = 100;
+    if (nvs_open("hiphi_halo", NVS_READONLY, &handle) == ESP_OK) {
+        if (nvs_get_u8(handle, "brightness", &value) != ESP_OK) value = 100;
+        nvs_close(handle);
+    }
+    return value >= 5 && value <= 100 ? value : 100;
+}
+
+bool platform_display_save_brightness(int percent) {
+    if (percent < 5 || percent > 100) return false;
+    nvs_handle_t handle;
+    if (nvs_open("hiphi_halo", NVS_READWRITE, &handle) != ESP_OK) return false;
+    esp_err_t err = nvs_set_u8(handle, "brightness", (uint8_t)percent);
+    if (err == ESP_OK) err = nvs_commit(handle);
+    uint8_t saved = 0;
+    if (err == ESP_OK) err = nvs_get_u8(handle, "brightness", &saved);
+    nvs_close(handle);
+    return err == ESP_OK && saved == percent;
 }
 
 static void backlight_init(void) {
@@ -115,7 +131,7 @@ static void backlight_init(void) {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .timer_sel = LEDC_TIMER_0,
-        .duty = BL_MAX_DUTY, /* always on, full brightness */
+        .duty = (uint32_t)platform_display_load_brightness() * BL_MAX_DUTY / 100,
         .hpoint = 0,
     };
     ESP_ERROR_CHECK(ledc_channel_config(&ch));
@@ -165,72 +181,18 @@ static bool touch_read(int16_t *x, int16_t *y) {
     return true;
 }
 
-/* Same gesture semantics as the Dial: swipe up / double tap -> art mode, swipe down -> exit.
- * Any touch while in art mode exits it and is not delivered to widgets. */
+/* Feed the real pointer stream to LVGL: its scroll engine cancels clicks on
+ * dragged widgets and provides pressed feedback, momentum and scroll snapping. */
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
     int16_t x, y;
     if (touch_read(&x, &y)) {
-        if (!s_tracking) {
-            s_start_x = x; s_start_y = y;
-            s_start_ms = esp_timer_get_time() / 1000;
-            s_tracking = true;
-            if (s_art_mode) { s_pending_exit_art = true; s_touch_swallowed = true; }
-        }
         s_last_x = x; s_last_y = y;
-        data->point.x = x;
-        data->point.y = y;
-        data->state = s_touch_swallowed ? LV_INDEV_STATE_RELEASED : LV_INDEV_STATE_PRESSED;
-        return;
-    }
-
-    data->point.x = s_last_x;
-    data->point.y = s_last_y;
-    data->state = LV_INDEV_STATE_RELEASED;
-    if (!s_tracking) return;
-    s_tracking = false;
-    if (s_touch_swallowed) { s_touch_swallowed = false; return; }
-
-    int64_t now_ms = esp_timer_get_time() / 1000;
-    if (now_ms - s_start_ms >= SWIPE_MAX_TIME_MS) return;
-    int16_t dx = s_last_x - s_start_x, dy = s_last_y - s_start_y;
-    if (s_rotation == 180) { dx = -dx; dy = -dy; }
-
-    if (dy < -SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-        if (bridge_client_is_ready_for_art_mode()) {
-            ESP_LOGI(TAG, "Swipe up - art mode");
-            s_pending_enter_art = true;
-        }
-    } else if (dy > SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-        ESP_LOGI(TAG, "Swipe down - exit art mode");
-        s_pending_exit_art = true;
-    } else if (abs(dx) < DOUBLE_TAP_MAX_DISTANCE && abs(dy) < DOUBLE_TAP_MAX_DISTANCE) {
-        if (now_ms - s_last_tap_ms < DOUBLE_TAP_MAX_MS &&
-            abs(s_last_x - s_last_tap_x) < DOUBLE_TAP_MAX_DISTANCE &&
-            abs(s_last_y - s_last_tap_y) < DOUBLE_TAP_MAX_DISTANCE) {
-            if (bridge_client_is_ready_for_art_mode()) {
-                ESP_LOGI(TAG, "Double tap - art mode");
-                s_pending_enter_art = true;
-            }
-            s_last_tap_ms = 0;
-        } else {
-            s_last_tap_ms = now_ms;
-            s_last_tap_x = s_last_x;
-            s_last_tap_y = s_last_y;
-        }
-    }
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else data->state = LV_INDEV_STATE_RELEASED;
+    data->point.x = s_last_x; data->point.y = s_last_y;
 }
-
-void platform_display_process_pending(void) {
-    if (s_pending_enter_art) {
-        s_pending_enter_art = false;
-        if (!s_art_mode) { s_art_mode = true; ui_set_controls_visible(false); }
-    }
-    if (s_pending_exit_art) {
-        s_pending_exit_art = false;
-        if (s_art_mode) { s_art_mode = false; ui_set_controls_visible(true); }
-    }
-}
+void platform_display_process_pending(void) { }
 
 /* ---------------- LVGL flush ---------------- */
 static void rotate180_rgb565(const uint16_t *src, uint16_t *dst, int n) {

@@ -1,5 +1,6 @@
 #include "platform/platform_input.h"
 #include "controller_input.h"
+#include "controller_touch_navigation.h"
 #include "controller_input_mailbox.h"
 #include "display_sleep.h"
 
@@ -264,6 +265,8 @@ void platform_input_process_events(void) {
         if (display_is_encoder_suppressed()) {
             return;
         }
+
+        if (controller_touch_navigation_encoder(total_ticks)) return;
 
         controller_physical_event_t event = {
             .source_id = CONTROLLER_INPUT_SOURCE_DIAL_BUILTIN,

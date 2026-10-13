@@ -76,6 +76,7 @@ static bool s_controls_visible = true;  // false in art mode; state updates must
 static lv_timer_t *s_volume_emphasis_timer;  // Timer to reset volume emphasis after adjustment
 static lv_obj_t *s_status_dot;         // Online/offline indicator
 static lv_obj_t *s_battery_icon;       // Battery icon (Material Symbols)
+static lv_obj_t *s_zone_header;
 static lv_obj_t *s_zone_label;         // Zone name
 static lv_obj_t *s_zone_glyph;         // Dim glyph shown in place of the faded zone label
 static lv_obj_t *s_btn_prev;           // Previous track button
@@ -95,6 +96,11 @@ static lv_obj_t *s_setup_logo;         // HiPhi mark, shown only on the Wi-Fi se
 // Artwork layers
 static lv_obj_t *s_artwork_container;  // Container for artwork layers
 static lv_obj_t *s_artwork_image;      // Album art image
+static void (*s_background_tap_handler)(void);
+static void background_tap_cb(lv_event_t *event) {
+    (void)event;
+    if (s_background_tap_handler) s_background_tap_handler();
+}
 static lv_obj_t *s_ui_container;       // Container for all UI widgets
 static lv_anim_t s_marquee_anim;
 static bool s_marquee_anim_ready = false;
@@ -359,6 +365,7 @@ static void build_layout(void) {
 
     // Create UI container directly (no intermediate overlay layer)
     s_ui_container = lv_obj_create(s_artwork_container);
+    lv_obj_add_event_cb(s_ui_container, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(s_ui_container, SCREEN_SIZE, SCREEN_SIZE);
     lv_obj_center(s_ui_container);
     lv_obj_set_style_bg_opa(s_ui_container, LV_OPA_TRANSP, 0);
@@ -432,6 +439,7 @@ static void build_layout(void) {
     // Header group - battery + zone at top (flex column, explicit position)
     // ========================================================================
     lv_obj_t *header = lv_obj_create(s_ui_container);
+    s_zone_header = header;
     lv_obj_set_size(header, SCREEN_SIZE - 60, 95);  // Tall tap zone extending toward volume
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(header, 0, 0);
@@ -485,6 +493,7 @@ static void build_layout(void) {
     // Now Playing group - volume, artist, track, controls (flex column, centered)
     // ========================================================================
     lv_obj_t *now_playing = lv_obj_create(s_ui_container);
+    lv_obj_add_event_cb(now_playing, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(now_playing, SCREEN_SIZE - 80, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(now_playing, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(now_playing, 0, 0);
@@ -526,6 +535,7 @@ static void build_layout(void) {
 
     // Controls row - flex row for transport buttons
     lv_obj_t *controls = lv_obj_create(now_playing);
+    lv_obj_add_event_cb(controls, background_tap_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_size(controls, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(controls, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(controls, 0, 0);
@@ -624,6 +634,10 @@ static bool s_zone_long_pressed = false;  // Prevent click after long press
 
 static void zone_label_event_cb(lv_event_t *e) {
     (void)e;
+    if (s_background_tap_handler) {
+        s_background_tap_handler();
+        return;
+    }
     // Skip click if it came from a long press release
     if (s_zone_long_pressed) {
         s_zone_long_pressed = false;
@@ -636,6 +650,7 @@ static void zone_label_event_cb(lv_event_t *e) {
 
 static void zone_label_long_press_cb(lv_event_t *e) {
     (void)e;
+    if (s_background_tap_handler) return;
     s_zone_long_pressed = true;  // Mark that we handled a long press
     controller_action_t action = controller_action_simple(
         CONTROLLER_ACTION_SHOW_SETTINGS);
@@ -1661,6 +1676,28 @@ void ui_trigger_update(void) {
 // ============================================================================
 // Display State Control - Art Mode
 // ============================================================================
+
+void ui_remove_legacy_zone_touch_target(void) {
+    if (!s_zone_header) return;
+    /* Native navigation owns zone selection. Keep status labels, but remove
+     * the old oversized touch region and both of its legacy actions. */
+    lv_obj_remove_flag(s_zone_header, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_event_cb(s_zone_header, zone_label_event_cb);
+    lv_obj_remove_event_cb(s_zone_header, zone_label_long_press_cb);
+}
+
+void ui_set_background_tap_handler(void (*handler)(void)) {
+    s_background_tap_handler = handler;
+}
+
+void ui_set_artwork_only(bool artwork_only) {
+    /* Hide the parent so poll updates, battery timers and optimistic volume
+     * feedback cannot reveal individual controls over artwork. Other targets
+     * retain their existing presentation unless they opt into this mode. */
+    if (!s_ui_container) return;
+    if (artwork_only) lv_obj_add_flag(s_ui_container, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(s_ui_container, LV_OBJ_FLAG_HIDDEN);
+}
 
 void ui_set_controls_visible(bool visible) {
     s_controls_visible = visible;

@@ -1,5 +1,6 @@
 #include "ui_network.h"
 #include "ui.h"
+#include "controller_touch_navigation.h"
 #include "font_manager.h"
 
 #include <esp_log.h>
@@ -536,7 +537,7 @@ void ui_network_set_ble_status(const char *status) {
     }
 }
 
-void ui_show_settings(void) {
+void ui_network_show_device_controls(void) {
     ensure_panel();
     refresh_labels();
     update_version_label();
@@ -548,15 +549,16 @@ void ui_show_settings(void) {
     }
     set_status_text("Wi-Fi idle");
     lv_obj_clear_flag(s_widgets.panel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(s_widgets.panel);
 }
 
-void ui_hide_settings(void) {
+void ui_network_hide_device_controls(void) {
     if (s_widgets.panel) {
         lv_obj_add_flag(s_widgets.panel, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
-bool ui_is_settings_visible(void) {
+bool ui_network_device_controls_visible(void) {
     return s_widgets.panel && !lv_obj_has_flag(s_widgets.panel, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -575,15 +577,31 @@ void ui_network_set_ble_status(const char *status) {
     (void)status;
 }
 
-void ui_show_settings(void) {
+void ui_network_show_device_controls(void) {
     ESP_LOGI(TAG, "Settings UI not available (no LVGL)");
 }
 
-void ui_hide_settings(void) {
+void ui_network_hide_device_controls(void) {
 }
 
-bool ui_is_settings_visible(void) {
+bool ui_network_device_controls_visible(void) {
     return false;
 }
 
 #endif
+
+void ui_show_settings(void) { controller_touch_navigation_settings(); }
+void ui_hide_settings(void) {
+    if (ui_network_device_controls_visible()) ui_network_hide_device_controls();
+    else controller_touch_navigation_close_settings();
+}
+bool ui_is_settings_visible(void) {
+    return ui_network_device_controls_visible() || controller_touch_navigation_settings_visible();
+}
+void ui_network_scroll_device_controls(int delta) {
+#if LVGL_VERSION_MAJOR
+    if (s_widgets.panel) lv_obj_scroll_by(s_widgets.panel, 0, -delta * 45, LV_ANIM_ON);
+#else
+    (void)delta;
+#endif
+}

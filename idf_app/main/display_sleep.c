@@ -19,6 +19,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "ui.h"
+#include "controller_touch_navigation.h"
 
 #include <string.h>
 
@@ -85,7 +86,8 @@ RTC_DATA_ATTR static power_debug_rtc_t s_power_debug_rtc = {
 #define DEFAULT_SLEEP_TIMEOUT_MS (RK_DEFAULT_SLEEP_CHARGING_TIMEOUT_SEC * 1000)
 
 // Backlight levels (0-255 for 8-bit PWM, from Kconfig)
-#define BACKLIGHT_NORMAL CONFIG_RK_BACKLIGHT_NORMAL
+static uint8_t s_user_backlight = CONFIG_RK_BACKLIGHT_NORMAL;
+#define BACKLIGHT_NORMAL s_user_backlight
 #define BACKLIGHT_DIM CONFIG_RK_BACKLIGHT_DIM
 
 // LVGL task priorities
@@ -208,6 +210,7 @@ void display_art_mode(void) {
 
     // Timer operations outside mutex to avoid deadlock (consistent with display_wake)
     if (entered_art_mode) {
+        controller_touch_navigation_show_artwork();
         if (s_art_mode_timer != NULL) {
             esp_timer_stop(s_art_mode_timer);
         }
@@ -226,7 +229,7 @@ void display_dim(void) {
 
     LOCK_DISPLAY_STATE();
     if (s_display_state == DISPLAY_STATE_NORMAL || s_display_state == DISPLAY_STATE_ART_MODE) {
-        display_set_backlight(BACKLIGHT_DIM);
+        display_set_backlight(BACKLIGHT_DIM < BACKLIGHT_NORMAL ? BACKLIGHT_DIM : BACKLIGHT_NORMAL);
         ui_set_controls_visible(false);
         s_display_state = DISPLAY_STATE_DIM;
         entered_dim = true;
@@ -346,12 +349,19 @@ void display_wake(void) {
         ui_set_controls_visible(true);
         s_display_state = DISPLAY_STATE_NORMAL;
         // Suppress widget touches after wake to prevent accidental activation
-        s_touch_suppress_until_ms = esp_timer_get_time() / 1000 + TOUCH_SUPPRESS_AFTER_WAKE_MS;
-        s_encoder_suppress_until_ms = esp_timer_get_time() / 1000 + ENCODER_SUPPRESS_AFTER_WAKE_MS;
+        if (prev_state == DISPLAY_STATE_DIM || prev_state == DISPLAY_STATE_SLEEP) {
+            s_touch_suppress_until_ms = esp_timer_get_time() / 1000 + TOUCH_SUPPRESS_AFTER_WAKE_MS;
+            s_encoder_suppress_until_ms = esp_timer_get_time() / 1000 + ENCODER_SUPPRESS_AFTER_WAKE_MS;
+        } else {
+            s_touch_suppress_until_ms = 0;
+            s_encoder_suppress_until_ms = 0;
+        }
         ESP_LOGI(TAG, "Display awake (brightness: %d%%)", (BACKLIGHT_NORMAL * 100) / 255);
     }
 
     UNLOCK_DISPLAY_STATE();
+
+    controller_touch_navigation_restore_visibility();
 
     // Reset timers outside of mutex to avoid deadlock
     // Sequential chain: start only the first enabled timer, each transition starts the next
@@ -775,8 +785,16 @@ void display_activity_detected(void) {
     uint32_t dim_timeout = s_dim_timeout_ms;
     uint32_t sleep_timeout = s_sleep_timeout_ms;
 
-    // Wake display if in art mode, dimmed, or sleeping (tap shows controls at normal brightness)
-    if (current_state == DISPLAY_STATE_ART_MODE || current_state == DISPLAY_STATE_DIM || current_state == DISPLAY_STATE_SLEEP) {
+    // Artwork is an awake listening surface; activity restarts its dim timer
+    // without revealing controls or suppressing the first volume detent.
+    if (current_state == DISPLAY_STATE_ART_MODE) {
+        if (s_dim_timer != NULL) esp_timer_stop(s_dim_timer);
+        if (dim_timeout > 0 && s_dim_timer != NULL) esp_timer_start_once(s_dim_timer, dim_timeout * 1000ULL);
+        return;
+    }
+
+    // Wake display if dimmed or sleeping
+    if (current_state == DISPLAY_STATE_DIM || current_state == DISPLAY_STATE_SLEEP) {
         display_wake();
         return;  // display_wake already starts the timer chain
     }
@@ -1006,4 +1024,13 @@ void display_update_power_settings(const rk_cfg_t *cfg) {
         }
     }
 #endif
+}
+
+void display_set_user_brightness(int percent) {
+    if (percent < 5) percent = 5;
+    if (percent > 100) percent = 100;
+    s_user_backlight = (uint8_t)(percent * 255 / 100);
+    display_state_t state = display_get_state();
+    if (state == DISPLAY_STATE_NORMAL || state == DISPLAY_STATE_ART_MODE)
+        display_set_backlight(s_user_backlight);
 }
