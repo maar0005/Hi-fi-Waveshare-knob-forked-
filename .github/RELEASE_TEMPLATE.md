@@ -14,7 +14,7 @@ This release includes the #266 integration: safer updates and configuration, con
 
 > **This is test firmware.** Install it yourself from the
 > [Alpha Web Flasher](https://firmware.hiphi.audio/alpha/). Alpha builds
-> are never sent through automatic OTA. The pre-release Dial artifact passed physical navigation and Menu touch checks. Every release image passes software checks, but new exact release images and other hardware still need physical regression testing. HALO's earlier touch redesign was tested; the final shared artifact is not yet physically qualified. We have not measured a battery-life improvement.
+> are never sent through automatic OTA. The pre-release Dial artifact passed physical navigation and Menu touch checks. Every release image passes software checks, but new exact release images and other hardware still need physical regression testing. HALO's earlier touch redesign was tested; the final shared artifact is not yet physically qualified. We have not measured a battery-life improvement yet.
 
 The sections below retain the cumulative changes since stable v2.5.2, including the v2.6 work that was offered only as a prerelease and was never promoted to stable or automatic OTA. The firmware family now includes ten physical controllers, with HALO added to the earlier nine.
 
