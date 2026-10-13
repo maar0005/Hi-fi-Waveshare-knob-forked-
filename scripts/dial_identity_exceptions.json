@@ -45,7 +45,9 @@
         "docs/meta/decisions/2025-12-20_DECISION_ROTATION.md",
         "docs/dev/IMPLEMENTATION_NOTES.md",
         "docs/dial/NETWORK_IDENTITY.md",
-        "docs/dial/BLE_HID.md"
+        "docs/dial/BLE_HID.md",
+        "docs/esp/NETWORK_IDENTITY.md",
+        "docs/esp/BLE_HID.md"
       ],
       "tokens": [
         "Roon Knob",
@@ -84,7 +86,12 @@
       "owner": "#163",
       "retirement": "Remove only after dual advertise/query compatibility is deployed and old consumers have migrated.",
       "path_globs": [
-        "common/platform/platform_mdns_esp.c"
+        "common/platform/platform_mdns_esp.c",
+        "idf_app/main/platform_mdns_idf.c",
+        "frame_app/main/platform_mdns_frame.c",
+        "roku/README.md",
+        "roku/shared/components/DiscoveryTask.brs",
+        "roku/shared/source/Discovery.brs"
       ],
       "tokens": [
         "_roonknob"
@@ -157,6 +164,45 @@
         "roon_knob"
       ],
       "line_regex": "(?:strcmp\\(app\\.project_name, \"roon_knob\"\\)|setup\\(\"roon_knob\",ESP_IMAGE_FLASH_SIZE_(?:8|16)MB\\))"
+    },
+    {
+      "id": "historical-docker-output",
+      "category": "historical-provenance",
+      "owner": "Documentation provenance",
+      "retirement": "Permanent while retained as an explicitly labelled historical command capture.",
+      "path_globs": [
+        "docs/usage/GETTING_STARTED.md"
+      ],
+      "tokens": [
+        "roon-knob"
+      ],
+      "line_regex": "Container roon-knob-roon-knob-bridge"
+    },
+    {
+      "id": "historical-image-filename",
+      "category": "historical-provenance",
+      "owner": "#174",
+      "retirement": "Rename only when asset paths are migrated with redirects or all references.",
+      "path_globs": [
+        "README.md"
+      ],
+      "tokens": [
+        "roon-knob"
+      ],
+      "line_regex": "docs/images/roon-knob-photo\\.jpg"
+    },
+    {
+      "id": "roku-logo-source-provenance",
+      "category": "historical-provenance",
+      "owner": "#273",
+      "retirement": "Permanent while the logo source remains the referenced repository asset.",
+      "path_globs": [
+        "roku/branding/README.md"
+      ],
+      "tokens": [
+        "roon-knob"
+      ],
+      "line_regex": "roon-knob/docs/images/hiphi-logo-512\\.png"
     }
   ],
   "required": [
