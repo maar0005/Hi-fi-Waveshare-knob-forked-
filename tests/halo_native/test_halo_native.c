@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+static lv_obj_t *s_zone_header;
+static int legacy_zone_taps;
+static void zone_label_event_cb(lv_event_t *e) { (void)e; legacy_zone_taps++; }
+static void zone_label_long_press_cb(lv_event_t *e) { (void)e; legacy_zone_taps++; }
+#include "header_touch_removal.h"
 struct test_queue {
   size_t size;
   bool occupied;
@@ -242,8 +247,20 @@ int main(int argc, char **argv) {
   results = xQueueCreate(1, sizeof(result_t *));
   bridge_client_get_request_base(endpoint, sizeof(endpoint));
   bridge_client_get_current_zone_id(zone, sizeof(zone));
+  s_zone_header = lv_obj_create(lv_screen_active());
+  lv_obj_set_size(s_zone_header, 300, 95);
+  lv_obj_align(s_zone_header, LV_ALIGN_TOP_MID, 0, 28);
+  lv_obj_add_event_cb(s_zone_header, zone_label_event_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(s_zone_header, zone_label_long_press_cb, LV_EVENT_LONG_PRESSED, NULL);
   change_screen(CONTROLLER_SCREEN_ARTWORK);
   advance(100);
+  assert(!lv_obj_has_flag(s_zone_header, LV_OBJ_FLAG_CLICKABLE));
+  assert(!lv_obj_has_flag(s_zone_header, LV_OBJ_FLAG_SCROLLABLE));
+  lv_obj_send_event(s_zone_header, LV_EVENT_CLICKED, NULL);
+  lv_obj_send_event(s_zone_header, LV_EVENT_LONG_PRESSED, NULL);
+  assert(legacy_zone_taps == 0);
+  lv_obj_delete(s_zone_header);
+  s_zone_header = NULL;
   assert(artwork_only);
   assert(lv_obj_has_flag(home_button, LV_OBJ_FLAG_HIDDEN));
   assert(!lv_obj_has_flag(art_touch, LV_OBJ_FLAG_HIDDEN));

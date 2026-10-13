@@ -770,6 +770,7 @@ static void carousel_end(lv_event_t *e) {
 static void ensure_overlay(void) {
   if (overlay)
     return;
+  ui_remove_legacy_zone_touch_target();
   overlay = lv_obj_create(lv_screen_active());
   lv_obj_set_size(overlay, 360, 360);
   lv_obj_center(overlay);

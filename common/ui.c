@@ -75,6 +75,7 @@ static lv_obj_t *s_volume_label_large; // Volume display (large, prominent) - pr
 static lv_timer_t *s_volume_emphasis_timer;  // Timer to reset volume emphasis after adjustment
 static lv_obj_t *s_status_dot;         // Online/offline indicator
 static lv_obj_t *s_battery_icon;       // Battery icon (Material Symbols)
+static lv_obj_t *s_zone_header;
 static lv_obj_t *s_zone_label;         // Zone name
 static lv_obj_t *s_zone_glyph;         // Dim glyph shown in place of the faded zone label
 static lv_obj_t *s_btn_prev;           // Previous track button
@@ -437,6 +438,7 @@ static void build_layout(void) {
     // Header group - battery + zone at top (flex column, explicit position)
     // ========================================================================
     lv_obj_t *header = lv_obj_create(s_ui_container);
+    s_zone_header = header;
     lv_obj_set_size(header, SCREEN_SIZE - 60, 95);  // Tall tap zone extending toward volume
     lv_obj_set_style_bg_opa(header, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(header, 0, 0);
@@ -1673,6 +1675,15 @@ void ui_trigger_update(void) {
 // ============================================================================
 // Display State Control - Art Mode
 // ============================================================================
+
+void ui_remove_legacy_zone_touch_target(void) {
+    if (!s_zone_header) return;
+    /* Native navigation owns zone selection. Keep status labels, but remove
+     * the old oversized touch region and both of its legacy actions. */
+    lv_obj_remove_flag(s_zone_header, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_event_cb(s_zone_header, zone_label_event_cb);
+    lv_obj_remove_event_cb(s_zone_header, zone_label_long_press_cb);
+}
 
 void ui_set_background_tap_handler(void (*handler)(void)) {
     s_background_tap_handler = handler;
