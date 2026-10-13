@@ -166,32 +166,6 @@
       "line_regex": "(?:strcmp\\(app\\.project_name, \"roon_knob\"\\)|setup\\(\"roon_knob\",ESP_IMAGE_FLASH_SIZE_(?:8|16)MB\\))"
     },
     {
-      "id": "historical-docker-output",
-      "category": "historical-provenance",
-      "owner": "Documentation provenance",
-      "retirement": "Permanent while retained as an explicitly labelled historical command capture.",
-      "path_globs": [
-        "docs/usage/GETTING_STARTED.md"
-      ],
-      "tokens": [
-        "roon-knob"
-      ],
-      "line_regex": "Container roon-knob-roon-knob-bridge"
-    },
-    {
-      "id": "historical-image-filename",
-      "category": "historical-provenance",
-      "owner": "#174",
-      "retirement": "Rename only when asset paths are migrated with redirects or all references.",
-      "path_globs": [
-        "README.md"
-      ],
-      "tokens": [
-        "roon-knob"
-      ],
-      "line_regex": "docs/images/roon-knob-photo\\.jpg"
-    },
-    {
       "id": "roku-logo-source-provenance",
       "category": "historical-provenance",
       "owner": "#273",

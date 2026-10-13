@@ -6,19 +6,17 @@ Free for personal, noncommercial use under PolyForm Noncommercial 1.0.0.
 Installers, integrators, and businesses need a commercial license (see
 [COMMERCIAL-LICENSE.md](https://github.com/muness/roon-knob/blob/master/COMMERCIAL-LICENSE.md)).
 
-This alpha consolidates every firmware change since the stable v2.5.2 release,
-including the v2.6 work that was offered only as a prerelease and was never
-promoted to stable or automatic OTA. HiPhi now supports nine physical
-controllers. The biggest change is how the Waveshare HiPhi Dial, our most
-popular controller, sleeps while idle. It also restores and expands the shared
-controller platform, adds BLE media remotes and nearby Wi-Fi lists, and gives
-every controller the same power-debug contract.
+This alpha adds an artwork-first touch interface to HiPhi Dial and HALO. Tap artwork to reveal Now playing and Menu; use Menu for Library, Zones and Settings. Touch lists scroll vertically, album covers scroll horizontally, and the knob browses on these pages. Artwork stays free of buttons, labels and rings. Zone selection now lives in Menu; the old overlapping header touch target is removed.
+
+Settings restores Wi-Fi and bridge configuration, saved networks, About, brightness and confirmed factory reset. Input-only library entries such as Search are hidden. Playback and library requests remain asynchronous so browsing does not stall input. The shared UI also keeps volume and battery hidden during background state updates in artwork mode, including targets that use the older controls layout.
+
+This release includes the #266 integration: safer updates and configuration, connection recovery and setup improvements, and wake-word detection disabled while no voice endpoint is available. It also includes the Roku clients already on master; those remain separate from ESP firmware.
 
 > **This is test firmware.** Install it yourself from the
 > [Alpha Web Flasher](https://firmware.hiphi.audio/alpha/). Alpha builds
-> are never sent through automatic OTA. Every image builds and passes the
-> shared software checks, but the exact release images still need physical
-> regression testing. We have not measured a battery-life improvement yet.
+> are never sent through automatic OTA. The pre-release Dial artifact passed physical navigation and Menu touch checks. Every release image passes software checks, but new exact release images and other hardware still need physical regression testing. HALO's earlier touch redesign was tested; the final shared artifact is not yet physically qualified. We have not measured a battery-life improvement.
+
+The sections below retain the cumulative changes since stable v2.5.2, including the v2.6 work that was offered only as a prerelease and was never promoted to stable or automatic OTA. The firmware family now includes ten physical controllers, with HALO added to the earlier nine.
 
 ## The Waveshare Dial now sleeps between jobs
 
@@ -89,14 +87,14 @@ also park the board's otherwise-unused auxiliary ESP32 once:
 
 ## Everything added since stable v2.5.2
 
-### Shared controller foundation and nine exact hardware profiles
+### Shared controller foundation and ten exact hardware profiles
 
 The work begun for v2.6 moved playback state, commands, configuration,
 connectivity, recovery, input routing, and presentation values behind shared
 controller interfaces rather than cloning the application for each board. It
 also restored HiPhi Frame on the current shared stack and added HiPhi RLCD,
 M5Stack Tough, AtomS3 JoyStick, M5Stack Dial v1.1, M5StickS3, StopWatch, and
-Kizz. Together with the Waveshare Dial, this alpha packages nine physical
+Kizz. Together with the Waveshare Dial, this alpha packages ten physical
 controller profiles.
 
 The Waveshare product is now named **HiPhi Dial** throughout the user-facing
@@ -130,7 +128,7 @@ remote; it does not make the HiPhi controller a Bluetooth keyboard or speaker.
 
 ### Nearby Wi-Fi scanning on every controller
 
-All nine physical controllers now scan for nearby 2.4 GHz networks during
+All ten physical controllers now scan for nearby 2.4 GHz networks during
 setup. The scan does not stop the setup access point. You can select a visible
 SSID, retry an empty or failed scan, or type a hidden network manually. The
 Waveshare Dial shows the list in both captive setup and connected settings.
@@ -142,7 +140,7 @@ Every physical controller exposes `/power-debug` and
 shows the power source, active timeouts, display state, reset and wake cause,
 and the sleep or power-off capabilities that the exact target implements.
 
-All nine controllers retain the terminal-power evidence described below. On
+All ten controllers retain the terminal-power evidence described below. On
 the Waveshare Dial, `POST /power-debug/sleep` additionally starts the persistent
 software-voltage or external-profiler experiment described above; other exact
 targets report that early voltage sampling is unsupported until their qualified
@@ -214,7 +212,7 @@ a similarly named revision.
 
 The M5 Dial image is for the current Dial v1.1 (K130-V11), not the end-of-life
 original Dial (K130). The auxiliary parking image belongs to the Waveshare
-HiPhi Dial; it is not a tenth controller.
+HiPhi Dial; it is not an eleventh controller.
 
 [Download SHA-256 checksums](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/SHA256SUMS.txt)
 

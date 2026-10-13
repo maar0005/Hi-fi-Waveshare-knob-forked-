@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep v2.7 alpha notes complete and honest about feature chronology."""
+"""Keep alpha notes complete and honest about feature chronology."""
 
 from __future__ import annotations
 
@@ -15,19 +15,19 @@ REQUIRED = (
     "## The Waveshare Dial now sleeps between jobs",
     "## Everything added since stable v2.5.2",
     "v2.6 work that was offered only as a prerelease",
-    "### Shared controller foundation and nine exact hardware profiles",
+    "### Shared controller foundation and ten exact hardware profiles",
     "### Safer configuration and browser updates",
     "BLE HOGP media-remote support is new compared with stable v2.5.2",
     "links the shared host into HiPhi RLCD",
     "### Nearby Wi-Fi scanning on every controller",
-    "All nine physical controllers now scan for nearby 2.4 GHz",
+    "All ten physical controllers now scan for nearby 2.4 GHz",
     "Waveshare Dial shows the list in both captive setup and connected settings",
     "one shared power snapshot now supplies",
     "16-sample ADC reading is cached for 15 seconds",
     "routine two-second now-playing request, response, and\n  parse messages",
     "Every physical controller exposes `/power-debug`",
     "The Dial's `/power-debug/sleep` endpoint now runs one persistent power",
-    "All nine controllers retain the terminal-power evidence",
+    "All ten controllers retain the terminal-power evidence",
     "`interval_sec=0` when using an external current profiler",
     "could therefore\nkeep the processor awake indefinitely",
     "HiPhi RLCD now sleeps the panel and processor",
@@ -42,7 +42,7 @@ REQUIRED = (
     "SKU C152",
     "SKU K151",
     "current Dial v1.1 (K130-V11), not the end-of-life\noriginal Dial (K130)",
-    "not a tenth controller",
+    "not an eleventh controller",
     "Alpha builds\n> are never sent through automatic OTA",
 )
 
@@ -50,6 +50,7 @@ FIRMWARE_ASSETS = (
     "hiphi_dial_merged.bin",
     "hiphi_knob_aux_park_merged.bin",
     "hiphi_frame_merged.bin",
+    "hiphi_halo_merged.bin",
     "hiphi_rlcd_merged.bin",
     "hiphi_joy_merged.bin",
     "hiphi_tough_merged.bin",
@@ -94,7 +95,7 @@ def main() -> int:
     print("Alpha release-note check passed")
     print("- BLE chronology and target expansion are explicit")
     print("- Dial power work and its measurement limits are explicit")
-    print("- all nine physical targets link to hardware and firmware")
+    print("- all ten physical targets link to hardware and firmware")
     return 0
 
 
