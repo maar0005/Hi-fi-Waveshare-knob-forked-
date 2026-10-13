@@ -2506,7 +2506,7 @@ jobs:
           done < <(find gh-pages-build -type f ! -name CNAME | sort)
           curl --fail --silent --show-error --location \
             "https://firmware.hiphi.audio/" --output deployed-release/firmware-center.html
-          cmp web/index.html deployed-release/firmware-center.html
+          cmp publish-root/index.html deployed-release/firmware-center.html
           grep -F 'url=./stable/' <(
             curl --fail --silent --show-error \
               "https://firmware.hiphi.audio/flash.html"
