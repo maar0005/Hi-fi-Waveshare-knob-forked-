@@ -13,6 +13,10 @@ void ui_update(const char *line1, const char *line2, bool playing, float volume,
 void ui_set_status(bool online);
 void ui_set_message(const char *msg);
 void ui_set_zone_name(const char *zone_name);
+void ui_set_zone_count(int count);  // Feeds the zone label presence policy
+// Show/hide the HiPhi mark above the product title on the Wi-Fi setup screen.
+// The widget is built as part of the first layout, so this only toggles a flag.
+void ui_set_setup_logo_visible(bool visible);
 void ui_show_zone_picker(const char **zone_names, const char **zone_ids, int zone_count, int selected_idx);
 void ui_hide_zone_picker(void);
 bool ui_is_zone_picker_visible(void);
@@ -36,6 +40,9 @@ void ui_trigger_update(void);  // Called when user taps update notification
 
 // Display state control
 void ui_set_controls_visible(bool visible);  // Show/hide UI controls for art mode
+void ui_remove_legacy_zone_touch_target(void);  // Native navigation owns zone selection
+void ui_set_background_tap_handler(void (*handler)(void));
+void ui_set_artwork_only(bool artwork_only);  // Hide the entire chrome layer, including arcs
 
 // Network status banner (persistent, doesn't auto-clear)
 void ui_set_network_status(const char *status);  // Show persistent network status (NULL to clear)

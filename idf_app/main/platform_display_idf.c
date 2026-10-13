@@ -1,4 +1,6 @@
 #include "platform_display_idf.h"
+#include "controller_touch_contact.h"
+#include "platform/platform_power.h"
 #include "platform/platform_display.h"
 #include "display_sleep.h"
 #include "bridge_client.h"
@@ -25,24 +27,7 @@
 
 static const char *TAG = "display";
 
-// Swipe gesture detection
-#define SWIPE_MIN_DISTANCE 60   // Minimum pixels for swipe
-#define SWIPE_MAX_TIME_MS 500   // Maximum time for swipe gesture
-static int16_t s_touch_start_x = 0;
-static int16_t s_touch_start_y = 0;
-static int64_t s_touch_start_time = 0;
-static bool s_touch_tracking = false;
-static volatile bool s_pending_art_mode = false;   // Deferred art mode activation
-static volatile bool s_pending_exit_art_mode = false;  // Deferred art mode exit
-static uint16_t s_current_rotation = 0;  // Track rotation for swipe direction transform
-
-// Double-tap detection for art mode toggle
-#define DOUBLE_TAP_MAX_MS 400      // Max time between taps
-#define DOUBLE_TAP_MAX_DISTANCE 40 // Max movement between taps
-static int64_t s_last_tap_time = 0;
-static int16_t s_last_tap_x = 0;
-static int16_t s_last_tap_y = 0;
-
+static controller_touch_contact_t s_touch_contact;
 // LVGL tick timer (critical for LVGL to know time is passing)
 static esp_timer_handle_t s_lvgl_tick_timer = NULL;
 #define LVGL_TICK_PERIOD_MS 2
@@ -63,6 +48,7 @@ static esp_timer_handle_t s_lvgl_tick_timer = NULL;
 #define PIN_NUM_LCD_DATA3   ((gpio_num_t)18)
 #define PIN_NUM_LCD_RST     ((gpio_num_t)21)
 #define PIN_NUM_BK_LIGHT    ((gpio_num_t)47)
+#define PIN_NUM_TOUCH_RST   ((gpio_num_t)10)
 
 // LCD initialization commands for SH8601 (from reference example)
 static const sh8601_lcd_init_cmd_t lcd_init_cmds[] = {
@@ -347,114 +333,41 @@ static void lvgl_tick_timer_cb(void *arg) {
     lv_tick_inc(LVGL_TICK_PERIOD_MS);
 }
 
-// LVGL touch read callback with swipe gesture detection
+// Feed real pointer movement to LVGL. LVGL rotates coordinates exactly once.
 static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     (void)indev;
     uint16_t x, y;
-
-    if (tpGetCoordinates(&x, &y)) {
+    bool down = tpGetCoordinates(&x, &y);
+    bool pressed = false;
+    if (down) {
         display_state_t state = display_get_state();
-        bool was_not_normal = (state != DISPLAY_STATE_NORMAL);
-
-        // Always track touch for swipe detection (even during wake)
-        if (!s_touch_tracking) {
-            s_touch_start_x = x;
-            s_touch_start_y = y;
-            s_touch_start_time = esp_timer_get_time() / 1000;  // Convert to ms
-            s_touch_tracking = true;
-        }
-
-        // Wake display if needed
-        if (was_not_normal) {
-            display_activity_detected();  // Wake display
-            // Consume this touch - don't pass to LVGL widgets (prevents accidental activation)
-            data->point.x = x;
-            data->point.y = y;
-            data->state = LV_INDEV_STATE_RELEASED;
-            return;  // Swipe tracking continues, but widget interaction suppressed
-        }
-
-        // Display already awake - check if touches suppressed after recent wake
-        if (display_is_touch_suppressed()) {
-            // Within 250ms after wake - suppress widget touches but track for swipes
-            data->point.x = x;  // Update coordinates for swipe detection
-            data->point.y = y;
-            data->state = LV_INDEV_STATE_RELEASED;
-            return;
-        }
-
-        // Normal touch processing
-        display_activity_detected();  // Reset sleep timers
-        data->point.x = x;
-        data->point.y = y;
-        data->state = LV_INDEV_STATE_PRESSED;
-    } else {
-        data->state = LV_INDEV_STATE_RELEASED;
-
-        // Check for swipe gesture on release
-        if (s_touch_tracking) {
-            int64_t elapsed = (esp_timer_get_time() / 1000) - s_touch_start_time;
-            int64_t now_ms = esp_timer_get_time() / 1000;
-
-            if (elapsed < SWIPE_MAX_TIME_MS) {
-                int16_t dx = data->point.x - s_touch_start_x;
-                int16_t dy = data->point.y - s_touch_start_y;
-
-                // Transform swipe direction for 180° rotation (#43)
-                // When rotated 180°, user's "swipe up" produces positive raw dy
-                if (s_current_rotation == 180) {
-                    dy = -dy;
-                    dx = -dx;
-                }
-
-                // Check for swipe up (negative Y direction) - enter art mode
-                if (dy < -SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-                    // Only allow art mode when WiFi is configured and bridge is responding with zones
-                    if (bridge_client_is_ready_for_art_mode()) {
-                        ESP_LOGI(TAG, "Swipe up detected (rotation=%d) - queueing art mode", s_current_rotation);
-                        s_pending_art_mode = true;  // Defer to avoid LVGL threading issues
-                    } else {
-                        ESP_LOGI(TAG, "Swipe up ignored - not ready for art mode (no zones)");
-                    }
-                }
-                // Check for swipe down (positive Y direction) - exit art mode
-                else if (dy > SWIPE_MIN_DISTANCE && abs(dy) > abs(dx)) {
-                    ESP_LOGI(TAG, "Swipe down detected (rotation=%d) - queueing exit art mode", s_current_rotation);
-                    s_pending_exit_art_mode = true;  // Defer to avoid LVGL threading issues
-                }
-                // Check for double-tap to enter art mode (#66)
-                // Only if this wasn't a swipe (small movement) and not already in art mode
-                // (any single tap exits art mode, so double-tap is only for entering)
-                else if (display_get_state() != DISPLAY_STATE_ART_MODE &&
-                         abs(dx) < DOUBLE_TAP_MAX_DISTANCE && abs(dy) < DOUBLE_TAP_MAX_DISTANCE) {
-                    int64_t tap_interval = now_ms - s_last_tap_time;
-                    int16_t tap_dx = abs(data->point.x - s_last_tap_x);
-                    int16_t tap_dy = abs(data->point.y - s_last_tap_y);
-
-                    if (tap_interval < DOUBLE_TAP_MAX_MS &&
-                        tap_dx < DOUBLE_TAP_MAX_DISTANCE &&
-                        tap_dy < DOUBLE_TAP_MAX_DISTANCE) {
-                        // Double-tap detected - enter art mode
-                        if (bridge_client_is_ready_for_art_mode()) {
-                            ESP_LOGI(TAG, "Double-tap detected - entering art mode");
-                            s_pending_art_mode = true;
-                        }
-                        s_last_tap_time = 0;  // Reset to prevent triple-tap
-                    } else {
-                        // First tap or tap too far from previous - record it
-                        s_last_tap_time = now_ms;
-                        s_last_tap_x = data->point.x;
-                        s_last_tap_y = data->point.y;
-                    }
-                }
-            }
-            s_touch_tracking = false;
-        }
-    }
+        bool asleep = state == DISPLAY_STATE_DIM || state == DISPLAY_STATE_SLEEP;
+        display_activity_detected();
+        pressed = controller_touch_contact_feed(&s_touch_contact, true, (int16_t)x, (int16_t)y,
+                                                asleep, display_is_touch_suppressed());
+    } else controller_touch_contact_feed(&s_touch_contact, false, 0, 0, false, false);
+    data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    data->point.x = s_touch_contact.x;
+    data->point.y = s_touch_contact.y;
 }
 
 bool platform_display_init(void) {
     ESP_LOGI(TAG, "Initializing display hardware");
+
+    /* Deep-sleep holds survive the reset boundary. Establish each awake level
+     * before releasing its hold so neither peripheral sees a power-on glitch. */
+    gpio_deep_sleep_hold_dis();
+    gpio_hold_dis(PIN_NUM_BK_LIGHT);
+    const gpio_config_t touch_reset_config = {
+        .pin_bit_mask = 1ULL << PIN_NUM_TOUCH_RST,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&touch_reset_config));
+    ESP_ERROR_CHECK(gpio_set_level(PIN_NUM_TOUCH_RST, 1));
+    ESP_ERROR_CHECK(gpio_hold_dis(PIN_NUM_TOUCH_RST));
 
     // Initialize backlight with PWM at reduced brightness (50%)
     ledc_timer_config_t ledc_timer = {
@@ -618,7 +531,7 @@ void platform_display_init_sleep(TaskHandle_t lvgl_task_handle) {
         ESP_LOGW(TAG, "Cannot init display sleep - panel not initialized");
         return;
     }
-    display_sleep_init(s_panel_handle, lvgl_task_handle);
+    display_sleep_init(s_panel_handle, s_io_handle, lvgl_task_handle);
 }
 
 bool platform_display_is_sleeping(void) {
@@ -626,20 +539,6 @@ bool platform_display_is_sleeping(void) {
 }
 
 void platform_display_process_pending(void) {
-    // Process deferred swipe gesture art mode
-    if (s_pending_art_mode) {
-        s_pending_art_mode = false;
-        display_art_mode();
-    }
-    // Process deferred exit art mode (swipe down)
-    if (s_pending_exit_art_mode) {
-        s_pending_exit_art_mode = false;
-        // Only exit if in art mode - use display_wake which handles state properly
-        if (display_get_state() == DISPLAY_STATE_ART_MODE) {
-            display_wake();  // Returns to normal state with controls visible
-        }
-    }
-    // Process deferred timer-triggered state changes
     display_process_pending();
 }
 
@@ -654,16 +553,16 @@ void platform_display_set_rotation(uint16_t degrees) {
     lv_display_rotation_t rotation;
     if (degrees == 180) {
         rotation = LV_DISPLAY_ROTATION_180;
-        s_current_rotation = 180;
+
     } else {
         if (degrees != 0) {
             ESP_LOGW(TAG, "Rotation %d not supported (only 0/180), using 0", degrees);
         }
         rotation = LV_DISPLAY_ROTATION_0;
-        s_current_rotation = 0;
+
     }
 
-    ESP_LOGI(TAG, "Setting display rotation to %d degrees", s_current_rotation);
+    ESP_LOGI(TAG, "Setting display rotation to %d degrees", rotation == LV_DISPLAY_ROTATION_180 ? 180 : 0);
     lv_display_set_rotation(s_display, rotation);
 }
 
@@ -675,10 +574,99 @@ void platform_display_apply_config(const rk_cfg_t *cfg, bool is_charging) {
     display_update_power_settings(cfg);
 }
 
-bool platform_battery_is_charging(void) {
-    return battery_is_charging();
+void platform_power_snapshot(platform_power_snapshot_t *out) {
+    if (!out) {
+        return;
+    }
+    /* battery.c caches one voltage sample, so these derived fields are from
+     * the same ADC reading rather than two independent 16-sample bursts. */
+    out->battery_level = battery_get_percentage();
+    /* This board exposes battery voltage but no true VBUS signal. Keep the
+     * observed source honest while retaining the calibrated threshold as the
+     * effective policy projection. */
+    out->source = PLATFORM_POWER_SOURCE_UNKNOWN;
+    out->external_power = battery_is_charging();
 }
 
-int platform_battery_get_level(void) {
-    return battery_get_percentage();
+void platform_power_diagnostics_enrich(platform_power_diagnostics_t *out) {
+    if (!out) {
+        return;
+    }
+    display_power_debug_snapshot_t dial = {0};
+    display_power_debug_snapshot(&dial);
+    out->capabilities = PLATFORM_POWER_CAP_DISPLAY_SLEEP |
+        PLATFORM_POWER_CAP_SOC_DEEP_SLEEP |
+        PLATFORM_POWER_CAP_RTC_EVIDENCE |
+        PLATFORM_POWER_CAP_FORCED_TEST |
+        PLATFORM_POWER_CAP_AUXILIARY_SOC |
+        PLATFORM_POWER_CAP_VOLTAGE_EXPERIMENT;
+    switch (dial.display_state) {
+    case DISPLAY_STATE_ART_MODE:
+        out->state = PLATFORM_POWER_STATE_ART;
+        break;
+    case DISPLAY_STATE_DIM:
+        out->state = PLATFORM_POWER_STATE_DIM;
+        break;
+    case DISPLAY_STATE_SLEEP:
+        out->state = PLATFORM_POWER_STATE_DISPLAY_SLEEP;
+        break;
+    case DISPLAY_STATE_NORMAL:
+    default:
+        out->state = PLATFORM_POWER_STATE_ACTIVE;
+        break;
+    }
+    out->policy_known = dial.power_policy_known;
+    out->deep_sleep_timer_active = dial.deep_sleep_timer_active;
+    out->debug_sleep_override_armed = dial.debug_sleep_override_armed;
+    out->art_timeout_sec = dial.art_timeout_sec;
+    out->dim_timeout_sec = dial.dim_timeout_sec;
+    out->display_sleep_timeout_sec = dial.panel_sleep_timeout_sec;
+    out->power_off_timeout_sec = dial.deep_sleep_timeout_sec;
+    out->art_transitions = dial.art_transitions;
+    out->dim_transitions = dial.dim_transitions;
+    out->display_sleep_transitions = dial.panel_sleep_transitions;
+    out->runtime_wakes = dial.runtime_wakes;
+    out->debug_sleep_arms = dial.debug_sleep_arms;
+    out->power_off_attempts = dial.deep_sleep_attempts;
+    out->preflight_completions = dial.preflight_completions;
+    out->power_off_entries = dial.deep_sleep_entries;
+    out->hardware_wakes = dial.encoder_wakes;
+    out->last_preflight_flags = dial.last_preflight_flags;
+    switch (dial.last_preflight_error) {
+    case 0:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_NONE;
+        break;
+    case 1:
+    case 3:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_WAKE_CONFIG;
+        break;
+    case 2:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_WAKE_ACTIVE;
+        break;
+    case 4:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_BLE;
+        break;
+    case 5:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_OUTPUTS;
+        break;
+    case 6:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_WIFI;
+        break;
+    case 7:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_DISPLAY;
+        break;
+    default:
+        out->last_preflight_error = PLATFORM_POWER_PREFLIGHT_ERROR_POLICY;
+        break;
+    }
+    out->reset_reason = dial.reset_reason;
+    out->wakeup_cause = dial.wakeup_cause;
+}
+
+bool platform_power_debug_arm_sleep(uint32_t delay_sec) {
+    return display_power_debug_arm_deep_sleep(delay_sec);
+}
+
+bool platform_power_experiment_supported(void) {
+    return true;
 }

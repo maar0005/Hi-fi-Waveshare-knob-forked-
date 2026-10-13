@@ -147,6 +147,9 @@ controller_config_write_result_t controller_config_promote_wifi(
     size_t index, controller_config_snapshot_t *out_committed);
 controller_config_write_result_t controller_config_remove_wifi(
     size_t index, controller_config_snapshot_t *out_committed);
+/* Resolve a displayed Wi-Fi name under the owner lock; safe after list reordering. */
+controller_config_write_result_t controller_config_remove_wifi_named(const char *ssid, controller_config_snapshot_t *out_committed);
+controller_config_write_result_t controller_config_promote_wifi_named(const char *ssid, controller_config_snapshot_t *out_committed);
 controller_config_write_result_t controller_config_set_endpoint(
     const char *bridge_base, bool from_mdns,
     controller_config_snapshot_t *out_committed);
