@@ -2,6 +2,8 @@
 
 ## 2.8.0-alpha.2
 
+- Stop ordinary Wi-Fi retries from disconnecting a new association before DHCP; cancel stale retries when an IP arrives.
+
 - Preserve stable v2.5.2 settings when its full V2 configuration retains a legacy version marker.
 
 - Reuse a verified bridge address after wake while preserving the selected hostname and zone; fall back to discovery when the address fails.

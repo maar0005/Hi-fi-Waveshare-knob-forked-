@@ -119,6 +119,19 @@ int main(void) {
     fixture_emit_got_ip(); assert(bridge_ready && bridge_invalidations == before);
     fixture_emit_changed_ip(); assert(bridge_ready && bridge_invalidations == before + 1);
     fixture_emit_sta_disconnected(WIFI_REASON_NO_AP_FOUND); assert(!bridge_ready);
+    unsigned disconnects = fixture_wifi_disconnect_calls();
+    assert(fixture_timer_active("wifi_retry"));
+    fixture_timer_fire("wifi_retry");
+    assert(fixture_wifi_disconnect_calls() == disconnects);
+    fixture_emit_sta_disconnected(WIFI_REASON_NO_AP_FOUND);
+    assert(fixture_timer_active("wifi_retry"));
+    fixture_emit_got_ip();
+    assert(!fixture_timer_active("wifi_retry"));
+    unsigned invalidations = bridge_invalidations;
+    fixture_emit_sta_start(); /* A late retry/start must preserve a usable IP. */
+    assert(bridge_ready && bridge_invalidations == invalidations);
+    fixture_emit_lost_ip();
+
 
 
     /* Configuration and event actors interleave: the next STA start must use
@@ -220,5 +233,7 @@ int main(void) {
     assert(!fixture_provisioning_effects_overlapped());
 
     wifi_mgr_stop();
+    fixture_emit_queued_got_ip(); /* Already queued before stop must not reopen the gate. */
+    assert(!bridge_ready);
     return 0;
 }

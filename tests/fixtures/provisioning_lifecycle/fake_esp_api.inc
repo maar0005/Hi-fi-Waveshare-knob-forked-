@@ -205,3 +205,7 @@ void fixture_emit_got_ip(void);
 void fixture_emit_lost_ip(void);
 
 void fixture_emit_changed_ip(void);
+
+unsigned fixture_wifi_disconnect_calls(void);
+
+void fixture_emit_queued_got_ip(void);

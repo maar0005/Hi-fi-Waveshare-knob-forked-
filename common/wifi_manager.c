@@ -447,6 +447,12 @@ static void network_unavailable(void) {
 }
 
 static void connect_now(void) {
+    /* A timer may already be queued when GOT_IP cancels it. Do not tear down
+     * a healthy connection or erase its readiness from that late callback. */
+    if (!lock_wifi_state()) return;
+    bool has_ip = s_ip[0] != 0;
+    unlock_wifi_state();
+    if (has_ip) return;
     network_unavailable();
     ensure_wifi_loaded();
     const char *hostname = get_device_hostname();
@@ -509,11 +515,9 @@ static void connect_now(void) {
         schedule_retry();
         return;
     }
-    esp_err_t err = esp_wifi_disconnect();
-    if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_STARTED && err != ESP_ERR_WIFI_NOT_INIT) {
-        ESP_LOGW(TAG, "disconnect failed: %s", esp_err_to_name(err));
-    }
-    err = esp_wifi_connect();
+    /* Ordinary retries start from DISCONNECTED. Disconnecting here queues a
+     * second failure and can interrupt a new association before DHCP completes. */
+    esp_err_t err = esp_wifi_connect();
     unlock_wifi_effect();
     rk_net_evt_cb(RK_NET_EVT_CONNECTING, NULL);
     if (err != ESP_OK) {
@@ -852,6 +856,11 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         return;
     }
 
+    if (!lock_wifi_state()) return;
+    bool applicable = s_started && !s_ap_mode && !s_wifi_mode_transitioning;
+    unlock_wifi_state();
+    if (!applicable || !event_data) return;
+
     const ip_event_got_ip_t *evt = (const ip_event_got_ip_t *)event_data;
     esp_ip4_addr_t ip = evt->ip_info.ip;
     char ip_text[sizeof(s_ip)] = {0};
@@ -882,7 +891,13 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     char context[sizeof(s_network_context)];
     snprintf(context, sizeof(context), "%s|%s|%s", active.ssid, gateway, netmask);
     bool changed = false;
+    esp_timer_handle_t retry_timer = NULL;
     if (lock_wifi_state()) {
+        if (!s_started || s_ap_mode || s_wifi_mode_transitioning) {
+            unlock_wifi_state();
+            return;
+        }
+        retry_timer = s_retry_timer;
         changed = s_ip[0] && (strcmp(s_ip, ip_text) != 0 || strcmp(s_network_context, context) != 0);
         copy_str(s_ip, sizeof(s_ip), ip_text);
         copy_str(s_network_context, sizeof(s_network_context), context);
@@ -897,6 +912,7 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     }
     /* DHCP may change the route without a station disconnect. Fence replies
      * from the previous network, while duplicate GOT_IP leaves evidence intact. */
+    if (retry_timer) (void)esp_timer_stop(retry_timer);
     if (changed) bridge_client_set_network_ready(false);
     bridge_client_set_network_ready(true);
     rk_net_evt_cb(RK_NET_EVT_GOT_IP, ip_text);
@@ -1148,6 +1164,14 @@ void wifi_mgr_apply_wifi(const controller_config_wifi_snapshot_t *wifi,
         wifi_mgr_stop_ap();
         // wifi_mgr_stop_ap switches to STA and triggers connect via event
     } else {
+        /* Only an explicit user/configuration reconnect tears down STA. The
+         * existing hostname-settle interval lets its disconnect event drain
+         * before the new configuration is applied. */
+        network_unavailable();
+        if (lock_wifi_effect()) {
+            (void)esp_wifi_disconnect();
+            unlock_wifi_effect();
+        }
         connect_now();
     }
 }
