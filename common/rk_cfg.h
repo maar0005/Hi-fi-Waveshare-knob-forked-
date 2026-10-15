@@ -435,7 +435,9 @@ static inline bool rk_cfg_prepare_storage_read(rk_cfg_t *cfg,
         }
         cfg->cfg_ver = RK_CFG_CURRENT_VER;
         needs_persist = true;
-    } else if (stored_len == RK_CFG_V2_SIZE && cfg->cfg_ver == 2) {
+    } else if (stored_len == RK_CFG_V2_SIZE && (cfg->cfg_ver == 2 || cfg->cfg_ver == 1)) {
+        /* Released stable v2.5.2 could retain cfg_ver=1 in a full V2 blob.
+         * The exact layout size, not the stale marker alone, identifies it. */
         (void)rk_cfg_terminate_string(cfg->ssid, sizeof(cfg->ssid));
         (void)rk_cfg_terminate_string(cfg->pass, sizeof(cfg->pass));
         if (cfg->ssid[0]) {

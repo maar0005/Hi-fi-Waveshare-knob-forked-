@@ -85,7 +85,7 @@ bool platform_storage_read(rk_cfg_t *out,
 
     if (stored_len == RK_CFG_V1_SIZE && out->cfg_ver == 1) {
         ESP_LOGI(TAG, "Upgrading this device's config from v1 to v3");
-    } else if (stored_len == RK_CFG_V2_SIZE && out->cfg_ver == 2) {
+    } else if (stored_len == RK_CFG_V2_SIZE && (out->cfg_ver == 2 || out->cfg_ver == 1)) {
         ESP_LOGI(TAG, "Upgrading this device's config from v2 to v3");
     } else if (stored_len != sizeof(*out)) {
         ESP_LOGW(TAG, "Config size mismatch (stored=%d, expected=%d), applying defaults",
