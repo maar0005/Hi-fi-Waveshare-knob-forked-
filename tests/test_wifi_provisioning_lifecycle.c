@@ -7,7 +7,11 @@
 #include "wifi_manager.h"
 
 static bool bridge_ready;
-void bridge_client_set_network_ready(bool ready) { bridge_ready = ready; }
+static unsigned bridge_invalidations;
+void bridge_client_set_network_ready(bool ready) {
+    if (bridge_ready && !ready) ++bridge_invalidations;
+    bridge_ready = ready;
+}
 static int s_ready_events;
 static int s_failure_events;
 
@@ -111,6 +115,9 @@ int main(void) {
     assert(!wifi_mgr_get_ip(ip, sizeof(ip)));
     assert(!wifi_mgr_get_network_context(network, sizeof(network)));
     fixture_emit_got_ip(); assert(bridge_ready);
+    unsigned before = bridge_invalidations;
+    fixture_emit_got_ip(); assert(bridge_ready && bridge_invalidations == before);
+    fixture_emit_changed_ip(); assert(bridge_ready && bridge_invalidations == before + 1);
     fixture_emit_sta_disconnected(WIFI_REASON_NO_AP_FOUND); assert(!bridge_ready);
 
 

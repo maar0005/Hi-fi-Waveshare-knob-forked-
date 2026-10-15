@@ -879,10 +879,13 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         ESP_LOGI(TAG, "Re-asserted hostname after IP acquisition: %s", hostname);
     }
 
+    char context[sizeof(s_network_context)];
+    snprintf(context, sizeof(context), "%s|%s|%s", active.ssid, gateway, netmask);
+    bool changed = false;
     if (lock_wifi_state()) {
+        changed = s_ip[0] && (strcmp(s_ip, ip_text) != 0 || strcmp(s_network_context, context) != 0);
         copy_str(s_ip, sizeof(s_ip), ip_text);
-        snprintf(s_network_context, sizeof(s_network_context), "%s|%s|%s",
-                 active.ssid, gateway, netmask);
+        copy_str(s_network_context, sizeof(s_network_context), context);
         s_backoff_idx = 0;
         s_sta_fail_count = 0;  // Reset failure count on successful connection
         s_last_error = NULL;   // Clear last error on success
@@ -892,6 +895,9 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         s_last_failed_reason = NULL;
         unlock_wifi_state();
     }
+    /* DHCP may change the route without a station disconnect. Fence replies
+     * from the previous network, while duplicate GOT_IP leaves evidence intact. */
+    if (changed) bridge_client_set_network_ready(false);
     bridge_client_set_network_ready(true);
     rk_net_evt_cb(RK_NET_EVT_GOT_IP, ip_text);
 }

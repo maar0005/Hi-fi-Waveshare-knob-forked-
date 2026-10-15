@@ -203,3 +203,5 @@ bool fixture_provisioning_effects_overlapped(void);
 
 void fixture_emit_got_ip(void);
 void fixture_emit_lost_ip(void);
+
+void fixture_emit_changed_ip(void);

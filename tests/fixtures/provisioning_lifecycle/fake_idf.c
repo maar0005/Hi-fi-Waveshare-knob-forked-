@@ -426,3 +426,9 @@ void fixture_emit_lost_ip(void) {
     assert(s_ip_lost_handler);
     s_ip_lost_handler(NULL, IP_EVENT, IP_EVENT_STA_LOST_IP, NULL);
 }
+
+void fixture_emit_changed_ip(void) {
+    ip_event_got_ip_t event = {.ip_info = {.ip = 0x1a01a8c0, .gw = 0x0101a8c0, .netmask = 0x00ffffff}};
+    assert(s_ip_handler);
+    s_ip_handler(NULL, IP_EVENT, IP_EVENT_STA_GOT_IP, &event);
+}
