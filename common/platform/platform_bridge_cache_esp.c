@@ -3,6 +3,7 @@
 #include "platform_mdns_endpoint.h"
 #include <nvs.h>
 #include <lwip/inet.h>
+#include <lwip/sockets.h>
 #include <string.h>
 
 static bool valid(const platform_bridge_cache_t *v) {
