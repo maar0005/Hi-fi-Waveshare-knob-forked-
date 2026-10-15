@@ -43,6 +43,7 @@ set(SRC_FILES
     "../../frame_app/main/dns_server.c"
     "../../frame_app/main/platform_http_frame.c"
     "../../common/platform/platform_mdns_esp.c"
+    "../../common/platform/platform_bridge_cache_esp.c"
     "../../frame_app/main/platform_provisioning_frame.c"
     "../../frame_app/main/platform_storage_frame.c"
 )

@@ -551,7 +551,15 @@
     "dial|idf_app/main/platform_touch_navigation_dial.c|idf_app/main/font_manager.h",
     "dial|idf_app/main/platform_touch_navigation_dial.c|idf_app/main/ui_network.h",
     "dial|idf_app/main/ui_network.c|common/controller_touch_navigation.h",
-    "dial|idf_app/main/platform_display_idf.c|common/controller_touch_contact.h"
+    "dial|idf_app/main/platform_display_idf.c|common/controller_touch_contact.h",
+    "dial|common/bridge_client.c|common/platform/platform_bridge_cache.h",
+    "dial|common/platform/platform_bridge_cache_esp.c|common/platform/platform_bridge_cache.h",
+    "dial|common/platform/platform_bridge_cache_esp.c|common/platform/platform_mdns_endpoint.h",
+    "dial|common/wifi_manager.c|common/bridge_client.h",
+    "frame|common/bridge_client.c|common/platform/platform_bridge_cache.h",
+    "frame|common/platform/platform_bridge_cache_esp.c|common/platform/platform_bridge_cache.h",
+    "frame|common/platform/platform_bridge_cache_esp.c|common/platform/platform_mdns_endpoint.h",
+    "frame|common/wifi_manager.c|common/bridge_client.h"
   ],
   "grandfathered_edges": [
     {

@@ -26,7 +26,6 @@ void rk_net_evt_cb(rk_net_evt_t event, const char *ip) {
     case RK_NET_EVT_GOT_IP:
         rlcd_ui_set_setup_mode(false);
         rlcd_ui_set_network_status("WiFi connected");
-        bridge_client_set_network_ready(true);
         atomic_store(&s_mdns_pending, true);
         atomic_store(&s_ble_pending, true);
         atomic_store(&s_sta_portal_pending, true);
@@ -34,7 +33,6 @@ void rk_net_evt_cb(rk_net_evt_t event, const char *ip) {
     case RK_NET_EVT_AP_STARTED:
         rlcd_ui_set_setup_mode(true);
         rlcd_ui_set_network_status("WiFi setup ready");
-        bridge_client_set_network_ready(false);
         break;
     case RK_NET_EVT_CONNECTING:
         rlcd_ui_set_network_status("WiFi connecting");
@@ -44,7 +42,6 @@ void rk_net_evt_cb(rk_net_evt_t event, const char *ip) {
     case RK_NET_EVT_NO_AP_FOUND:
     case RK_NET_EVT_AUTH_TIMEOUT:
         rlcd_ui_set_network_status(ip ? ip : "WiFi unavailable");
-        bridge_client_set_network_ready(false);
         break;
     default:
         break;

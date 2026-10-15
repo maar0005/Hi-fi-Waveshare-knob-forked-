@@ -43,6 +43,8 @@ void wifi_mgr_apply_wifi(const controller_config_wifi_snapshot_t *wifi,
                          bool reconnect);
 void wifi_mgr_forget_wifi(void);             // clears this device's configuration and reboots
 bool wifi_mgr_get_ip(char *buf, size_t n);   // "a.b.c.d"
+/* Stable across station DHCP changes; invalid while offline. */
+bool wifi_mgr_get_network_context(char *out, size_t len);
 void wifi_mgr_get_ssid(char *buf, size_t n);
 bool wifi_mgr_is_ap_mode(void);              // true if in AP provisioning mode
 bool wifi_mgr_start_provisioning(void);       // true only when setup AP mode can start

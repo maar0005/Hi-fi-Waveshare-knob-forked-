@@ -6,6 +6,7 @@
 #include "platform/platform_http.h"
 #include "platform/platform_log.h"
 #include "platform/platform_mdns.h"
+#include "platform/platform_bridge_cache.h"
 #include "platform/platform_mdns_endpoint.h"
 #include "platform/platform_power.h"
 #include "platform/platform_task.h"
@@ -124,6 +125,8 @@ static atomic_bool s_running = ATOMIC_VAR_INIT(false);
 static atomic_uint s_worker_start_attempts = ATOMIC_VAR_INIT(0);
 static bool s_trigger_poll;
 static atomic_bool s_network_ready = ATOMIC_VAR_INIT(false);
+static atomic_uint s_network_epoch = ATOMIC_VAR_INIT(0);
+static char s_connection_network[96];
 static bool s_force_artwork_refresh;  // Force artwork reload on zone change
 static float s_last_known_volume = 0.0f;   // Cached volume for optimistic UI updates
 static float s_last_known_volume_min = -80.0f;  // Cached volume min for clamping
@@ -659,11 +662,26 @@ static bool update_connection(void) {
     controller_connection_select(&next, token.bridge_base,
                                  token.from_mdns || !token.bridge_base[0], token.generation);
     uint64_t now = platform_millis();
-    next.offline = false;
+    unsigned network_epoch = atomic_load_explicit(&s_network_epoch, memory_order_acquire);
+    next.offline = !atomic_load_explicit(&s_network_ready, memory_order_acquire);
+    char network[96] = {0};
+    wifi_mgr_get_network_context(network, sizeof(network));
+    platform_bridge_cache_t cache = {0};
+    if (!next.offline && network[0] && platform_bridge_cache_read(&cache) &&
+        strcmp(cache.selected, token.bridge_base) == 0 && strcmp(cache.network, network) == 0 &&
+        !next.endpoint[0]) {
+        rk_strlcpy(next.endpoint, cache.endpoint, sizeof(next.endpoint));
+    }
+    lock_state();
+    bool same_network = !s_connection_network[0] || strcmp(s_connection_network, network) == 0;
+    unlock_state();
+    if (!same_network) { next.endpoint[0] = 0; next.resolved = false; }
+    bool cached = next.endpoint[0] != 0;
+
     char selected_host[64] = {0};
     bool literal = platform_mdns_url_host(token.bridge_base, selected_host, sizeof(selected_host), NULL) &&
                    strspn(selected_host, "0123456789.") == strlen(selected_host);
-    bool needs_discovery = next.automatic || !literal;
+    bool needs_discovery = !cached && !literal;
     controller_connection_attempt_phase_t phase = controller_connection_attempt_phase(
         &next, needs_discovery, platform_mdns_is_ready(), now);
     switch (phase) {
@@ -676,39 +694,72 @@ static bool update_connection(void) {
         break;
     }
     platform_mdns_observation_t observed = {0};
-    if (next.automatic) platform_mdns_observe_bridge(token.bridge_base, &observed);
-    next.discovered = observed.seen;
-    next.ambiguous = observed.ambiguous;
-    next.mdns_resolution_failed = false;
-    next.resolved = false;
-    next.resolver = CONNECTION_RESOLVER_NONE;
-    next.endpoint[0] = 0;
-    const char *identity = observed.seen ? observed.identity : token.bridge_base;
-    if (!next.ambiguous && observed.endpoint[0]) {
-        rk_strlcpy(next.endpoint, observed.endpoint, sizeof(next.endpoint));
-        next.resolved = true; next.resolver = CONNECTION_RESOLVER_MDNS;
-    } else if (!next.ambiguous && identity[0]) {
-        bool dns = false, failed = false;
-        next.resolved = platform_mdns_resolve_base_url(identity, next.endpoint,
-                                sizeof(next.endpoint), &dns, &failed);
-        next.mdns_resolution_failed = failed;
-        if (next.resolved) {
-            char host[64];
-            bool literal = platform_mdns_url_host(identity, host, sizeof(host), NULL) &&
-                           strspn(host, "0123456789.") == strlen(host);
-            next.resolver = literal ? CONNECTION_RESOLVER_LITERAL :
-                            dns ? CONNECTION_RESOLVER_DNS : CONNECTION_RESOLVER_MDNS;
-        }
+    /* Revalidate the known endpoint before asking multicast/DNS. Cached
+     * addresses cannot establish readiness for an unrelated/missing zone. */
+    if (literal && !cached) rk_strlcpy(next.endpoint, token.bridge_base, sizeof(next.endpoint));
+    bool valid = (cached || literal) && probe_connection(next.endpoint, &next) &&
+                 (literal || next.selected_zone_available);
+    if (valid) {
+        next.resolved = true;
+        next.resolver = literal ? CONNECTION_RESOLVER_LITERAL : CONNECTION_RESOLVER_CACHE;
     }
-    bool valid = next.resolved && probe_connection(next.endpoint, &next);
+    /* Learn a legacy automatic IP's stable name while it is still reachable.
+     * Discovery failure here must never undo the successful direct probe. */
+    if (valid && literal && next.automatic && platform_mdns_is_ready())
+        platform_mdns_observe_bridge(token.bridge_base, &observed);
+    if (!valid && (platform_mdns_is_ready() || (!next.automatic && literal))) {
+        if (next.automatic) platform_mdns_observe_bridge(token.bridge_base, &observed);
+        next.discovered = observed.seen;
+        next.ambiguous = observed.ambiguous;
+        next.mdns_resolution_failed = false;
+        next.resolved = false;
+        next.resolver = CONNECTION_RESOLVER_NONE;
+        next.endpoint[0] = 0;
+        const char *identity = observed.seen ? observed.identity : token.bridge_base;
+        if (!next.ambiguous && observed.endpoint[0]) {
+            rk_strlcpy(next.endpoint, observed.endpoint, sizeof(next.endpoint));
+            next.resolved = true; next.resolver = CONNECTION_RESOLVER_MDNS;
+        } else if (!next.ambiguous && identity[0]) {
+            bool dns = false, failed = false;
+            next.resolved = platform_mdns_resolve_base_url(identity, next.endpoint,
+                                    sizeof(next.endpoint), &dns, &failed);
+            next.mdns_resolution_failed = failed;
+            if (next.resolved) {
+                char host[64];
+                bool literal = platform_mdns_url_host(identity, host, sizeof(host), NULL) &&
+                               strspn(host, "0123456789.") == strlen(host);
+                next.resolver = literal ? CONNECTION_RESOLVER_LITERAL :
+                                dns ? CONNECTION_RESOLVER_DNS : CONNECTION_RESOLVER_MDNS;
+            }
+        }
+        valid = next.resolved && probe_connection(next.endpoint, &next);
+    }
     if (!valid) controller_connection_api(&next, false, -1, false, platform_millis());
     if (valid) next.next_attempt_ms = platform_millis() + 60000;
     else controller_connection_schedule(&next, platform_millis(), false);
     /* Reject all evidence as well as writes if a manual decision raced I/O. */
     controller_config_endpoint_token_t current;
-    if (!controller_config_capture_endpoint_token(&current) || current.generation != token.generation)
+    if (!controller_config_capture_endpoint_token(&current) || current.generation != token.generation ||
+        network_epoch != atomic_load_explicit(&s_network_epoch, memory_order_acquire) ||
+        !atomic_load_explicit(&s_network_ready, memory_order_acquire))
         return false;
-    lock_state(); s_connection = next; unlock_state();
+    lock_state();
+    if (network_epoch != atomic_load_explicit(&s_network_epoch, memory_order_acquire) ||
+        !atomic_load_explicit(&s_network_ready, memory_order_acquire)) {
+        unlock_state();
+        return false;
+    }
+    s_connection = next;
+    rk_strlcpy(s_connection_network, network, sizeof(s_connection_network));
+    unlock_state();
+    if (valid && next.selected_zone_available && network[0]) {
+        cache = (platform_bridge_cache_t){.version = 1};
+        const char *selection = observed.seen && !observed.ambiguous ? observed.identity : token.bridge_base;
+        rk_strlcpy(cache.selected, selection, sizeof(cache.selected));
+        rk_strlcpy(cache.endpoint, next.endpoint, sizeof(cache.endpoint));
+        rk_strlcpy(cache.network, network, sizeof(cache.network));
+        platform_bridge_cache_write(&cache);
+    }
     char summary[128];
     controller_connection_summary(&next, summary, sizeof(summary));
     LOGI("Connection: %s (discovered=%d resolver=%d zones=%d retry_in_ms=%llu)",
@@ -1345,6 +1396,7 @@ void bridge_client_set_network_ready(bool ready) {
     }
 
     if (ready == was_ready) return;
+    atomic_fetch_add_explicit(&s_network_epoch, 1, memory_order_acq_rel);
     lock_state();
     s_connection.offline = !ready;
     s_connection.reachable = false;

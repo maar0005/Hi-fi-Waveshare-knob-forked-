@@ -15,6 +15,8 @@ assets = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assets)
 
 
+ALPHA_VERSION = re.search(r"^# Alpha v([^ ]+)", (ROOT / "web/assets/alpha-changelog.md").read_text())[1]
+
 class AssetVersioningTests(unittest.TestCase):
     def test_changed_bytes_change_urls_and_keep_old_assets_valid(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -60,7 +62,8 @@ class AssetVersioningTests(unittest.TestCase):
             # the old workflow comparison even though the deployment is right.
             self.assertNotEqual((ROOT / 'web/index.html').read_bytes(), deployed.read_bytes())
 
-    def comparison_fixture(self, root, channel="alpha", version="2.8.0-alpha.1"):
+    def comparison_fixture(self, root, channel="alpha", version=None):
+        version = version or ALPHA_VERSION
         (root / 'assets').mkdir()
         for name in ('styles.css', 'site.js'):
             (root / 'assets' / name).write_text('asset')
@@ -96,7 +99,7 @@ class AssetVersioningTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             original = self.comparison_fixture(root)
-            (root / 'next.html').write_text(original.replace('v2.8.0-alpha.1', 'v2.8.0-alpha.2'))
+            (root / 'next.html').write_text(original.replace('v' + ALPHA_VERSION, 'v99.0.0-alpha.1'))
             with self.assertRaisesRegex(ValueError, 'Update alpha-changelog'):
                 assets.prepare_site(root)
             self.assertEqual(original, (root / 'index.html').read_text())
@@ -104,11 +107,11 @@ class AssetVersioningTests(unittest.TestCase):
     def test_notes_escape_html_and_reject_incomplete_metadata(self):
         from render_firmware_site_preview import comparison
         source = (ROOT / 'web/assets/alpha-changelog.md').read_text()
-        rendered = comparison(source.replace('artwork-only', '<script>bad()</script>'), '2.8.0-alpha.1')
+        rendered = comparison(source.replace('artwork-only', '<script>bad()</script>'), ALPHA_VERSION)
         self.assertNotIn('<script>', rendered)
         self.assertIn('&lt;script&gt;', rendered)
         with self.assertRaises(ValueError):
-            comparison(source.replace('## Requires UHC v4', '## Other'), '2.8.0-alpha.1')
+            comparison(source.replace('## Requires UHC v4', '## Other'), ALPHA_VERSION)
 
     def test_preview_waits_for_matching_bytes_not_just_http_200(self):
         import os

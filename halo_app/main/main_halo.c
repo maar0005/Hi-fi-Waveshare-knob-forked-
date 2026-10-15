@@ -83,7 +83,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
   case RK_NET_EVT_GOT_IP:
     ESP_LOGI(TAG, "WiFi connected with IP: %s", ip_opt ? ip_opt : "unknown");
     post_runtime_network_status(NULL);
-    bridge_client_set_network_ready(true);
       s_mdns_init_pending = true;
     atomic_store_explicit(&s_sta_server_pending, true, memory_order_release);
     break;
@@ -99,7 +98,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
     char msg[64];
     snprintf(msg, sizeof(msg), "WiFi: %s (%d/%d)", error, attempt, max);
     post_runtime_network_status(msg);
-    bridge_client_set_network_ready(false);
     break;
   }
 
@@ -111,7 +109,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
     ui_update(platform_product_name(), msg, false, 0.0f, 0.0f, 100.0f, 1.0f, 0, 0);
     ui_set_zone_name("WiFi Setup");
     ui_set_setup_logo_visible(true);
-    bridge_client_set_network_ready(false);
     atomic_store_explicit(&s_sta_server_pending, false, memory_order_release);
     break;
 

@@ -11,6 +11,17 @@ static bool mdns_ready = true;
 bool platform_mdns_is_ready(void) { return mdns_ready; }
 static bool resolution_ok, http_ok, race;
 static const char *http_body;
+static platform_bridge_cache_t retained_cache;
+static char network_context[96] = "home|192.168.1.1|255.255.255.0";
+static bool disconnect_during_http;
+bool wifi_mgr_get_network_context(char *out, size_t len) {
+    snprintf(out, len, "%s", network_context); return out[0] != 0;
+}
+bool platform_bridge_cache_read(platform_bridge_cache_t *out) {
+    *out = retained_cache; return out->version == 1;
+}
+void platform_bridge_cache_write(const platform_bridge_cache_t *value) { retained_cache = *value; }
+
 static void (*queued)(void *);
 static void *queued_arg;
 bool controller_config_snapshot(controller_config_snapshot_t *out) { *out = fixture; return true; }
@@ -41,6 +52,10 @@ bool platform_mdns_resolve_base_url(const char *base, char *out, size_t len,
 uint64_t platform_millis(void) { return clock_ms; }
 int platform_http_get(const char *url, char **out, size_t *len) {
     assert(strstr(url, "/zones?knob_id=") || strstr(url, "/now_playing?zone_id=")); ++http_calls;
+    if (disconnect_during_http) {
+        atomic_store(&s_network_ready, false);
+        atomic_fetch_add(&s_network_epoch, 1);
+    }
     if (race) { ++generation; strcpy(fixture.value.bridge_base, "http://manual:8088"); fixture.value.bridge_from_mdns = false; }
     *out = http_ok ? strdup(http_body) : NULL;
     *len = *out ? strlen(*out) : 0;
@@ -79,6 +94,9 @@ static void reset(const char *url, bool automatic) {
     memset(&fixture, 0, sizeof(fixture)); memset(&s_connection,0,sizeof(s_connection));
     memset(&s_state,0,sizeof(s_state)); advertised = (platform_mdns_observation_t){0};
     strcpy(fixture.value.bridge_base,url); fixture.value.bridge_from_mdns = automatic;
+    memset(&retained_cache, 0, sizeof(retained_cache));
+    s_connection_network[0] = 0; disconnect_during_http = false;
+    strcpy(network_context, "home|192.168.1.1|255.255.255.0");
     generation = 1; clock_ms = 1000; discovery_calls = resolve_calls = http_calls = writes = 0;
     queued = NULL; resolution_ok = http_ok = true; race = false;
     s_last_known_volume_fixed = true; s_volume_capability_zone[0] = 0; controls=volume_overlays=0;
@@ -247,4 +265,83 @@ static void test_discovery_waits_for_initialization(void) {
  reset("http://192.168.1.2:8088",false);mdns_ready=false;
  update_connection();assert(http_calls==1);mdns_ready=true;
 }
-int main(void) { test_now_playing_json_strings(); test_fixed_volume_response_and_zone_switch(); test_discovery_waits_for_initialization(); test_zone_cycle_wraps_without_copying_inventory(); test_partial_api_success_preserves_backoff(); test_zone_refresh_invalidates_old_readiness(); test_volume_uses_current_connection_evidence(); test_unresolved_then_recovered(); test_failed_and_stale_candidates(); }
+static void test_refresh_keeps_working_address(void) {
+    reset("http://nas2.local:8088", true);
+    strcpy(fixture.value.zone_id, "roon:room");
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:room\"}]}";
+    assert(update_connection());
+    clock_ms = s_connection.next_attempt_ms;
+    resolution_ok = false;
+    unsigned queries = resolve_calls;
+    assert(update_connection());
+    assert(s_connection.reachable && s_connection.selected_zone_available);
+    assert(strcmp(s_connection.endpoint, "http://192.168.1.2:8088") == 0);
+    assert(resolve_calls == queries); /* Working HTTP must not require a new DNS answer. */
+}
+static void test_offline_never_queries(void) {
+    reset("http://nas2.local:8088", true);
+    atomic_store(&s_network_ready, false);
+    assert(!update_connection());
+    assert(!discovery_calls && !resolve_calls && !http_calls);
+    assert(!s_connection.failures && !s_connection.next_attempt_ms);
+}
+static void test_wake_reuses_verified_address(void) {
+    reset("http://nas2.local:8088", true);
+    strcpy(fixture.value.zone_id, "roon:room");
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:room\"}]}";
+    assert(update_connection());
+    assert(retained_cache.version == 1);
+    memset(&s_connection, 0, sizeof(s_connection)); s_connection_network[0] = 0;
+    resolution_ok = false; mdns_ready = false;
+    unsigned queries = discovery_calls + resolve_calls;
+    assert(update_connection());
+    assert(controller_connection_ready(&s_connection));
+    assert(discovery_calls + resolve_calls == queries);
+    assert(strcmp(fixture.value.bridge_base, "http://nas2.local:8088") == 0);
+    assert(writes == 0); mdns_ready = true;
+}
+static void test_stale_cache_and_network_change(void) {
+    test_wake_reuses_verified_address();
+    memset(&s_connection, 0, sizeof(s_connection)); s_connection_network[0] = 0;
+    /* A different UHC at the cached address must not replace our zone. */
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:other\"}]}";
+    assert(!update_connection());
+    assert(!controller_connection_ready(&s_connection));
+    assert(strcmp(fixture.value.zone_id, "roon:room") == 0);
+    memset(&s_connection, 0, sizeof(s_connection));
+    strcpy(network_context, "hotel|10.0.0.1|255.255.255.0");
+    unsigned requests = http_calls;
+    assert(!update_connection());
+    assert(http_calls == requests); /* Never probe home cache on another LAN. */
+    /* DHCP move: only fresh selected-service discovery chooses a new address. */
+    clock_ms = s_connection.next_attempt_ms;
+    advertised.seen = true; strcpy(advertised.identity, "http://nas2.local:8088");
+    strcpy(advertised.endpoint, "http://10.0.0.55:8088");
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:room\"}]}";
+    assert(update_connection());
+    assert(strcmp(s_connection.endpoint, "http://10.0.0.55:8088") == 0);
+}
+static void test_disconnect_fences_inflight_probe(void) {
+    reset("http://nas2.local:8088", true);
+    disconnect_during_http = true;
+    assert(!update_connection());
+    assert(!s_connection.reachable && !retained_cache.version);
+}
+static void test_legacy_automatic_ip_keeps_hostname_recovery(void) {
+    reset("http://192.168.1.2:8088", true);
+    strcpy(fixture.value.zone_id, "roon:room");
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:room\"}]}";
+    advertised.seen = true;
+    strcpy(advertised.identity, "http://nas2.local:8088");
+    strcpy(advertised.endpoint, "http://192.168.1.2:8088");
+    assert(update_connection());
+    assert(queued); /* Reusing an old IP must not prevent learning its durable name. */
+    { void (*cb)(void *) = queued; void *arg = queued_arg; queued = NULL; queued_arg = NULL; cb(arg); }
+    assert(strcmp(fixture.value.bridge_base, "http://nas2.local:8088") == 0);
+    assert(strcmp(retained_cache.selected, fixture.value.bridge_base) == 0);
+    memset(&s_connection, 0, sizeof(s_connection)); s_connection_network[0] = 0;
+    advertised = (platform_mdns_observation_t){0}; resolution_ok = false;
+    assert(update_connection()); /* Learned name and address survive restart together. */
+    assert(controller_connection_ready(&s_connection));
+}
+int main(void) { test_legacy_automatic_ip_keeps_hostname_recovery(); test_wake_reuses_verified_address(); test_stale_cache_and_network_change(); test_disconnect_fences_inflight_probe(); test_refresh_keeps_working_address(); test_offline_never_queries(); test_now_playing_json_strings(); test_fixed_volume_response_and_zone_switch(); test_discovery_waits_for_initialization(); test_zone_cycle_wraps_without_copying_inventory(); test_partial_api_success_preserves_backoff(); test_zone_refresh_invalidates_old_readiness(); test_volume_uses_current_connection_evidence(); test_unresolved_then_recovered(); test_failed_and_stale_candidates(); }

@@ -16,6 +16,7 @@ set(SRC_FILES
     "platform_http_frame.c"
     "platform_storage_frame.c"
     "../../common/platform/platform_mdns_esp.c"
+    "../../common/platform/platform_bridge_cache_esp.c"
     "platform_log_frame.c"
     "platform_identity_frame.c"
     "platform_provisioning_frame.c"

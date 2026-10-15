@@ -27,6 +27,7 @@ set(SRC_FILES
     "../../tough_app/main/platform_http_tough.c"
     "../../tough_app/main/platform_storage_tough.c"
     "../../common/platform/platform_mdns_esp.c"
+    "../../common/platform/platform_bridge_cache_esp.c"
     "../../tough_app/main/platform_log_tough.c"
     "../../tough_app/main/platform_provisioning_tough.c"
     "../../tough_app/main/captive_portal.c"

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 typedef enum { CONNECTION_RESOLVER_NONE, CONNECTION_RESOLVER_LITERAL,
-    CONNECTION_RESOLVER_MDNS, CONNECTION_RESOLVER_DNS } connection_resolver_t;
+    CONNECTION_RESOLVER_MDNS, CONNECTION_RESOLVER_DNS, CONNECTION_RESOLVER_CACHE } connection_resolver_t;
 /* Owned by the bridge worker; readers receive a copy under its state lock. */
 typedef struct {
     char selected[128];

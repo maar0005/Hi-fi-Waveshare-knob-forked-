@@ -28,4 +28,29 @@ class RetentionTests(unittest.TestCase):
      if not step.get('uses','').startswith('peaceiris/actions-gh-pages'):continue
      options=step['with']
      self.assertEqual(options['keep_files'],not options.get('destination_dir','').startswith('pr/'))
+ def test_production_staging_handles_empty_tree_and_last_deletion(self):
+  import subprocess
+  import textwrap
+  workflow=(Path(__file__).parents[1]/'.github/workflows/firmware-preview-retention.yml').read_text()
+  start=workflow.index('          cd published-site\n')+len('          cd published-site\n')
+  end=workflow.index('          git config user.name',start)
+  stage=textwrap.dedent(workflow[start:end])
+  for mode in ('absent','empty','closed','open'):
+   with self.subTest(mode=mode),tempfile.TemporaryDirectory() as d:
+    root=Path(d)
+    def git(*args):
+     return subprocess.run(['git',*args],cwd=root,check=True,capture_output=True,text=True)
+    git('init','--quiet')
+    (root/'stable').mkdir();(root/'stable/firmware.bin').write_text('release')
+    if mode in ('closed','open'):
+     (root/'pr/1').mkdir(parents=True);(root/'pr/1/firmware.bin').write_text('preview')
+    git('add','.')
+    git('-c','user.name=Test','-c','user.email=test@example.invalid','-c','commit.gpgsign=false','commit','-qm','fixture')
+    if mode=='empty':(root/'pr').mkdir()
+    m.prune(root,{1} if mode=='open' else set(),True)
+    # Even if an unrelated file changes, only pr/ deletions may be staged.
+    (root/'stable/firmware.bin').write_text('unrelated change')
+    subprocess.run(['bash','-e','-c',stage],cwd=root,check=True,capture_output=True,text=True)
+    expected='pr/1/firmware.bin' if mode=='closed' else ''
+    self.assertEqual(git('diff','--cached','--name-only').stdout.strip(),expected)
 if __name__=='__main__':unittest.main()

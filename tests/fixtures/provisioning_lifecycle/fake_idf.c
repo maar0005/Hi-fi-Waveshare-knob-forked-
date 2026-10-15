@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "fake_esp_api.inc"
 
 #include <pthread.h>
@@ -31,6 +33,8 @@ static struct {
 } s_wifi_handlers[2];
 static size_t s_wifi_handler_count;
 static esp_event_handler_t s_ip_handler;
+static esp_event_handler_t s_queued_ip_handler;
+static esp_event_handler_t s_ip_lost_handler;
 static pthread_mutex_t s_fixture_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t s_fixture_cond = PTHREAD_COND_INITIALIZER;
 static bool s_block_task_delay;
@@ -225,6 +229,9 @@ esp_err_t esp_event_handler_register(esp_event_base_t base, int32_t id,
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         s_ip_handler = handler;
+        s_queued_ip_handler = handler;
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_LOST_IP) {
+        s_ip_lost_handler = handler;
     }
     return ESP_OK;
 }
@@ -242,6 +249,8 @@ esp_err_t esp_event_handler_unregister(esp_event_base_t base, int32_t id,
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         s_ip_handler = NULL;
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_LOST_IP) {
+        s_ip_lost_handler = NULL;
     }
     (void)handler;
     return ESP_OK;
@@ -268,8 +277,7 @@ esp_err_t esp_netif_sntp_init(const esp_sntp_config_t *config) {
     return ESP_OK;
 }
 char *esp_ip4addr_ntoa(const esp_ip4_addr_t *addr, char *buf, size_t size) {
-    (void)addr;
-    snprintf(buf, size, "0.0.0.0");
+    snprintf(buf, size, IPSTR, IP2STR(addr));
     return buf;
 }
 void esp_restart(void) {}
@@ -326,7 +334,9 @@ esp_err_t esp_wifi_connect(void) {
     s_wifi_connect_calls++;
     return ESP_OK;
 }
-esp_err_t esp_wifi_disconnect(void) { return ESP_OK; }
+static unsigned s_disconnect_calls;
+unsigned fixture_wifi_disconnect_calls(void) { return s_disconnect_calls; }
+esp_err_t esp_wifi_disconnect(void) { ++s_disconnect_calls; return ESP_OK; }
 esp_err_t esp_wifi_set_max_tx_power(int power) { (void)power; return ESP_OK; }
 esp_err_t esp_wifi_scan_start(const wifi_scan_config_t *config, bool block) {
     (void)config;
@@ -409,4 +419,26 @@ bool controller_config_wifi_snapshot(controller_config_wifi_snapshot_t *out) {
     }
     memset(out, 0, sizeof(*out));
     return true;
+}
+
+void fixture_emit_got_ip(void) {
+    ip_event_got_ip_t event = {.ip_info = {.ip = 0x1901a8c0, .gw = 0x0101a8c0, .netmask = 0x00ffffff}};
+    assert(s_ip_handler);
+    s_ip_handler(NULL, IP_EVENT, IP_EVENT_STA_GOT_IP, &event);
+}
+void fixture_emit_lost_ip(void) {
+    assert(s_ip_lost_handler);
+    s_ip_lost_handler(NULL, IP_EVENT, IP_EVENT_STA_LOST_IP, NULL);
+}
+
+void fixture_emit_changed_ip(void) {
+    ip_event_got_ip_t event = {.ip_info = {.ip = 0x1a01a8c0, .gw = 0x0101a8c0, .netmask = 0x00ffffff}};
+    assert(s_ip_handler);
+    s_ip_handler(NULL, IP_EVENT, IP_EVENT_STA_GOT_IP, &event);
+}
+
+void fixture_emit_queued_got_ip(void) {
+    ip_event_got_ip_t event = {.ip_info = {.ip = 0x1901a8c0, .gw = 0x0101a8c0, .netmask = 0x00ffffff}};
+    assert(s_queued_ip_handler);
+    s_queued_ip_handler(NULL, IP_EVENT, IP_EVENT_STA_GOT_IP, &event);
 }

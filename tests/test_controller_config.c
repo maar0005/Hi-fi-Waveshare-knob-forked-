@@ -254,6 +254,22 @@ static void test_same_device_v1_v2_v3_and_default_preparation(void) {
     assert(v2.sleep_poll_stopped_sec == 75);
     assert(v2.bridge_from_mdns == 1);
 
+    /* Stable v2.5.2 can persist the full V2 layout with the old V1 marker.
+     * Exact hardware evidence: 374-byte blob, cfg_ver=1, valid NVS CRC. */
+    rk_cfg_t stable_252 = {0};
+    memcpy(&stable_252, s_v2_blob, sizeof(s_v2_blob));
+    stable_252.cfg_ver = 1;
+    assert(rk_cfg_prepare_storage_read(&stable_252, RK_CFG_V2_SIZE));
+    assert(strcmp(stable_252.ssid, "v2-ssid") == 0);
+    assert(strcmp(stable_252.pass, "v2-pass") == 0);
+    assert(strcmp(stable_252.bridge_base, "http://v2.example") == 0);
+    assert(strcmp(stable_252.zone_id, "v2-zone") == 0);
+    assert(strcmp(stable_252.wifi[0].ssid, "v2-ssid") == 0);
+    assert(stable_252.cfg_ver == RK_CFG_CURRENT_VER);
+    assert(stable_252.rotation_charging == 270);
+    assert(stable_252.art_mode_charging_timeout_sec == 300);
+    assert(stable_252.bridge_from_mdns == 1);
+
     rk_cfg_t v3 = {0};
     memcpy(&v3, s_v3_blob, sizeof(s_v3_blob));
     assert(!rk_cfg_prepare_storage_read(&v3, sizeof(v3)));
