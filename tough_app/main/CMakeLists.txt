@@ -8,6 +8,7 @@ set(SRC_FILES
     "platform_http_tough.c"
     "platform_storage_tough.c"
     "../../common/platform/platform_mdns_esp.c"
+    "../../common/platform/platform_bridge_cache_esp.c"
     "platform_log_tough.c"
     "platform_identity_tough.c"
     "platform_display_m5.c"

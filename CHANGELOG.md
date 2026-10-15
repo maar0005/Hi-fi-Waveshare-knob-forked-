@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.8.0-alpha.2
+
+- Reuse a verified bridge address after wake while preserving the selected hostname and zone; fall back to discovery when the address fails.
+- Share Wi-Fi readiness ordering across all controllers and clear readiness on IP loss before reconnect work.
+- Guard recovery with runtime, NVS persistence and Wi-Fi lifecycle regressions, plus a CI contract keeping every target on the shared path (#284).
+
+
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]

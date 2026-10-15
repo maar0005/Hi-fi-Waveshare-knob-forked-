@@ -1,5 +1,7 @@
 #include "wifi_manager.h"
 #include "portal_trace.h"
+#include "bridge_client.h"
+#include <stdio.h>
 
 #include <esp_err.h>
 #include <esp_event.h>
@@ -141,6 +143,7 @@ static bool s_provisioning_ready;
 static bool s_provisioning_service_ready;
 static bool s_provisioning_service_starting;
 static char s_ip[16];
+static char s_network_context[96];
 static bool s_ap_mode;           // true when in AP provisioning mode
 static bool s_wifi_mode_transitioning;
 static int s_sta_fail_count;     // consecutive STA connection failures
@@ -433,7 +436,18 @@ static void start_ap_mode(void);
 static void start_provisioning_service(void);
 static void cancel_provisioning_retry(void);
 
+/* Clear readiness before retry/provisioning effects or target UI work. */
+static void network_unavailable(void) {
+    bridge_client_set_network_ready(false);
+    if (lock_wifi_state()) {
+        s_ip[0] = 0;
+        s_network_context[0] = 0;
+        unlock_wifi_state();
+    }
+}
+
 static void connect_now(void) {
+    network_unavailable();
     ensure_wifi_loaded();
     const char *hostname = get_device_hostname();
 
@@ -710,6 +724,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         }
         connect_now();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        network_unavailable();
         // Extract disconnect reason from event data
         wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
         uint8_t reason = disconn ? disconn->reason : 0;
@@ -829,6 +844,10 @@ static void wifi_scan_done_handler(void *arg, esp_event_base_t event_base,
 
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     (void)arg;
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP) {
+        network_unavailable();
+        return;
+    }
     if (event_base != IP_EVENT || event_id != IP_EVENT_STA_GOT_IP) {
         return;
     }
@@ -837,6 +856,10 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     esp_ip4_addr_t ip = evt->ip_info.ip;
     char ip_text[sizeof(s_ip)] = {0};
     esp_ip4addr_ntoa(&ip, ip_text, sizeof(ip_text));
+
+    char gateway[16], netmask[16];
+    esp_ip4addr_ntoa(&evt->ip_info.gw, gateway, sizeof(gateway));
+    esp_ip4addr_ntoa(&evt->ip_info.netmask, netmask, sizeof(netmask));
 
     // Debug: Verify hostname persists after connection
     const char *check_hostname = NULL;
@@ -858,6 +881,8 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
 
     if (lock_wifi_state()) {
         copy_str(s_ip, sizeof(s_ip), ip_text);
+        snprintf(s_network_context, sizeof(s_network_context), "%s|%s|%s",
+                 active.ssid, gateway, netmask);
         s_backoff_idx = 0;
         s_sta_fail_count = 0;  // Reset failure count on successful connection
         s_last_error = NULL;   // Clear last error on success
@@ -867,10 +892,12 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
         s_last_failed_reason = NULL;
         unlock_wifi_state();
     }
+    bridge_client_set_network_ready(true);
     rk_net_evt_cb(RK_NET_EVT_GOT_IP, ip_text);
 }
 
 static void start_ap_mode(void) {
+    network_unavailable();
     if (!lock_wifi_effect()) {
         return;
     }
@@ -1038,6 +1065,7 @@ void wifi_mgr_start(void) {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                                 &wifi_scan_done_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ip_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, &ip_event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED,
                                                 &ap_ip_event_handler, NULL));
 
@@ -1172,6 +1200,15 @@ bool wifi_mgr_get_ip(char *buf, size_t n) {
     return true;
 }
 
+bool wifi_mgr_get_network_context(char *out, size_t len) {
+    if (!out || !len) return false;
+    out[0] = 0;
+    if (!lock_wifi_state()) return false;
+    if (s_ip[0]) copy_str(out, len, s_network_context);
+    unlock_wifi_state();
+    return out[0] != 0;
+}
+
 void wifi_mgr_get_ssid(char *buf, size_t n) {
     if (!buf || n == 0) {
         return;
@@ -1228,6 +1265,7 @@ int wifi_mgr_get_retry_max(void) {
 }
 
 void wifi_mgr_stop(void) {
+    network_unavailable();
     if (!lock_wifi_effect()) {
         return;
     }
@@ -1267,6 +1305,7 @@ void wifi_mgr_stop(void) {
     esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_SCAN_DONE,
                                  &wifi_scan_done_handler);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &ip_event_handler);
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_LOST_IP, &ip_event_handler);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED, &ap_ip_event_handler);
 
     // Stop retry timer

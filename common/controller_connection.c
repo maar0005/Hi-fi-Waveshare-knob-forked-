@@ -66,7 +66,7 @@ void controller_connection_details(const controller_connection_t *c, uint64_t no
     if (retry) snprintf(next, sizeof(next), "In %llu seconds", (unsigned long long)retry);
     else snprintf(next, sizeof(next), "Due now");
     const char *method = c->automatic && !c->selected[0] && !c->discovered && !c->resolved ? "Automatic discovery" : !c->automatic ? "Manually configured" :
-        c->resolver == CONNECTION_RESOLVER_LITERAL ? "Automatic, using a saved address" :
+        (c->resolver == CONNECTION_RESOLVER_LITERAL || c->resolver == CONNECTION_RESOLVER_CACHE) ? "Automatic, using a saved address" :
         c->discovered ? "Automatic discovery" : "Automatic, using a saved bridge";
     snprintf(out, len, "Bridge address: %s\nConnection method: %s\nPlayback zones: %s\nLast response: %s\n%s: %s",
         c->endpoint[0] ? c->endpoint : "Not found yet", method, zones, success,

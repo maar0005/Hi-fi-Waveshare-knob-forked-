@@ -14,6 +14,7 @@ set(SRC_FILES
     "platform_storage_idf.c"
     "platform_http_idf.c"
     "../../common/platform/platform_mdns_esp.c"
+    "../../common/platform/platform_bridge_cache_esp.c"
     "platform_log_idf.c"
     "platform_input_idf.c"
     "platform_identity_idf.c"

@@ -9,14 +9,14 @@ Users reach playback and recover from ordinary address changes/outages without m
 Wi-Fi availability is an input observation, not a separate definition of controller usability. Duplicate network-ready notifications do not reset readiness. Zone metadata can remain cached; it does not establish readiness without current API evidence. A missing saved zone is not silently replaced with another zone.
 
 ## Selection and persistence
-DNS-SD hostname plus port identifies the chosen local service. Keep that name in the existing configuration URL; current numeric addresses live only in runtime state. This reuses existing storage and requires no new HTTP endpoints, protocol fields, or storage migration. DNS-SD naming provides continuity, not authentication or protection against a malicious LAN participant.
+DNS-SD hostname plus port identifies the chosen local service. Keep that name in the existing configuration URL. A versioned NVS sidecar in `rk_bridge/verified` retains the last verified numeric endpoint, selected name, and Wi-Fi SSID/gateway/netmask context across Deep-sleep and board power-off. It does not change the V3 configuration blob or replace the selected name. Invalid or absent records are ignored; writes occur only when the verified cache record changes. DNS-SD naming provides continuity, not authentication or protection against a malicious LAN participant.
 
 An empty automatic selection searches all returned records and refuses distinct competing services. An existing hostname scopes the search; an old numeric selection matches only a record advertising that same address and port. A valid zones response is required before persisting a discovered name. Manual edits win over both in-flight probes and queued writes through endpoint-generation tokens.
 
 A legacy IP whose address changed before its identity was learned cannot be recovered unambiguously. Preserve it and allow explicit selection rather than silently choosing another bridge. A hostname change, rather than just an IP change, likewise requires explicit selection. This is the accepted compatibility limit of the existing identity format.
 
 ## Recovery and presentation
-Resolution tries mDNS then ordinary DNS; a literal IP needs neither. A returned service record without an address is recorded as discovered, unresolved. API response/schema validation, zone availability, and selected-zone availability are separate. Last success is timestamped; readiness expires after two minutes without successful evidence.
+Recovery first probes an existing or cached numeric endpoint when selection and network context match. Cache reuse requires a valid zones response containing the selected zone; it cannot choose a replacement zone. If that probe fails, resolution tries mDNS then ordinary DNS; a literal IP needs neither. A healthy numeric endpoint does not depend on mDNS initialization or fresh multicast responses. A returned service record without an address is recorded as discovered, unresolved. API response/schema validation, zone availability, and selected-zone availability are separate. Last success is timestamped; readiness expires after two minutes without successful evidence.
 
 Local recovery starts immediately, then backs off 5/15/30/60 seconds, capped at one minute. Stable operation checks the selected service every minute while retaining ordinary playback polling. Failed playback cannot continually reset backoff merely because the zones probe succeeds. Address changes do not write flash repeatedly; a stable selected name produces no configuration writes. Reboot starts a new bounded local attempt sequence; these are local LAN requests, not HiPhi Cloud traffic.
 
@@ -72,3 +72,11 @@ entry and record-to-query matching. Reinstall the managed mDNS component to
 remove it. The script rejects unexpected source layouts and is idempotent.
 Timing-sensitive failures can change under logging; compare good/bad attempts
 before concluding that a packet was lost on Wi-Fi rather than in software.
+
+## Wake recovery guardrails (#284)
+
+The shared Wi-Fi manager is the sole producer of bridge network readiness for all ten controller targets. It opens the gate only after GOT_IP, closes it before disconnect/retry/provisioning/stop work, and closes it on LOST_IP even without a station disconnect. Target callbacks own UI and deferred service initialization only. Reconnection clears the attempt deadline; network epochs reject probes that cross a disconnect/reconnect, including successful stale replies. A working HTTP endpoint is validated before any periodic discovery refresh.
+
+The sidecar is a trusted-LAN optimization, not an authenticated bridge identity. SSID/gateway/netmask scope prevents ordinary cross-network reuse; selected-zone validation rejects a different installation with unrelated zones. The existing API cannot distinguish two installations exposing identical zone IDs, nor cryptographically authenticate a cached IP or DNS-SD name. Adding such an identity requires a coordinated UHC protocol change; this release does not claim that property. An explicit manual numeric URL retains its existing semantics.
+
+CI runs the real bridge recovery path, the actual Wi-Fi event handler and NVS cache adapter with deterministic I/O, and `check_bridge_recovery_contract.py` enforces one shared implementation in every controller build. Coverage includes wake before mDNS initialization, unavailable DNS, a healthy address during failed discovery, stale cache and DHCP moves, network changes, unrelated zones, in-flight disconnects/manual edits, corrupt cache records, and coalesced flash writes. The original #284 tester report still needs exact version/sleep-state capture and repeated on-device qualification.

@@ -6,6 +6,8 @@
 #include "fake_esp_api.inc"
 #include "wifi_manager.h"
 
+static bool bridge_ready;
+void bridge_client_set_network_ready(bool ready) { bridge_ready = ready; }
 static int s_ready_events;
 static int s_failure_events;
 
@@ -66,7 +68,10 @@ static void *event_actor(void *unused) {
 }
 
 void rk_net_evt_cb(rk_net_evt_t evt, const char *detail) {
+    if (evt == RK_NET_EVT_GOT_IP) assert(bridge_ready);
+    if (evt == RK_NET_EVT_CONNECTING || evt == RK_NET_EVT_NO_AP_FOUND) assert(!bridge_ready);
     if (evt == RK_NET_EVT_AP_STARTED) {
+        assert(!bridge_ready);
         assert(detail && strcmp(detail, "192.168.4.1") == 0);
         s_ready_events++;
     }
@@ -95,6 +100,19 @@ int main(void) {
     wifi_mgr_apply_wifi(&wifi, true);
     assert(fixture_wifi_connect_calls() == 1);
     assert(strcmp(fixture_wifi_ssid(), "saved-network") == 0);
+    /* Exercise production event handlers, including IP loss without a Wi-Fi
+     * disconnect. Target UI callbacks must observe already-updated readiness. */
+    assert(!bridge_ready);
+    fixture_emit_got_ip(); assert(bridge_ready);
+    char network[96], ip[16];
+    assert(wifi_mgr_get_network_context(network, sizeof(network)));
+    assert(strstr(network, "saved-network|192.168.1.1|255.255.255.0"));
+    fixture_emit_lost_ip(); assert(!bridge_ready);
+    assert(!wifi_mgr_get_ip(ip, sizeof(ip)));
+    assert(!wifi_mgr_get_network_context(network, sizeof(network)));
+    fixture_emit_got_ip(); assert(bridge_ready);
+    fixture_emit_sta_disconnected(WIFI_REASON_NO_AP_FOUND); assert(!bridge_ready);
+
 
     /* Configuration and event actors interleave: the next STA start must use
      * one coherent, newly-applied projection rather than a torn entry/index. */

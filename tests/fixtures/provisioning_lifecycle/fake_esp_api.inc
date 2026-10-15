@@ -25,6 +25,7 @@ typedef void (*esp_event_handler_t)(void *, esp_event_base_t, int32_t, void *);
 #define WIFI_EVENT_STA_DISCONNECTED 2
 #define WIFI_EVENT_SCAN_DONE 3
 #define IP_EVENT_STA_GOT_IP 1
+#define IP_EVENT_STA_LOST_IP 3
 #define IP_EVENT_AP_STAIPASSIGNED 2
 #define WIFI_EVENT_AP_STACONNECTED 4
 #define WIFI_EVENT_AP_STADISCONNECTED 5
@@ -122,7 +123,7 @@ typedef struct { int unused; } wifi_init_config_t;
 typedef struct { uint8_t reason; } wifi_event_sta_disconnected_t;
 typedef struct { uint8_t mac[6]; } wifi_event_ap_staconnected_t;
 typedef struct { uint8_t reason; } wifi_event_ap_stadisconnected_t;
-typedef struct { struct { esp_ip4_addr_t ip; } ip_info; } ip_event_got_ip_t;
+typedef struct { struct { esp_ip4_addr_t ip, gw, netmask; } ip_info; } ip_event_got_ip_t;
 typedef struct { esp_ip4_addr_t ip; } ip_event_ap_staipassigned_t;
 #define IPSTR "%u.%u.%u.%u"
 #define IP2STR(a) (unsigned)(*(a) & 0xff), (unsigned)((*(a) >> 8) & 0xff), \
@@ -199,3 +200,6 @@ void fixture_block_provisioning_start(void);
 void fixture_wait_provisioning_start_entered(void);
 void fixture_release_provisioning_start(void);
 bool fixture_provisioning_effects_overlapped(void);
+
+void fixture_emit_got_ip(void);
+void fixture_emit_lost_ip(void);

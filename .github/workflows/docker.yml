@@ -58,6 +58,8 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/test_controller_navigation.c common/controller_navigation.c -o /tmp/test-controller-navigation
           /tmp/test-controller-navigation
           scripts/test_connection_runtime.sh
+          bash scripts/test_bridge_cache.sh
+          python3 scripts/check_bridge_recovery_contract.py
           python3 tests/test_firmware_stack_audit.py
           python3 tests/test_firmware_site_assets.py
           node scripts/check_firmware_site.js

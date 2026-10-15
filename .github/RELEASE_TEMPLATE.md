@@ -1,5 +1,14 @@
 # HiPhi v{{VERSION}}
 
+## Bridge recovery after sleep and Wi-Fi interruption
+
+This alpha addresses #284: a Dial tester reported that the bridge was sometimes lost after wake until reboot. Every controller now uses the same recovery path. It retains the selected bridge name and a last-working numeric address, scoped to the Wi-Fi network, and checks that address before waiting for discovery again. A temporary discovery failure no longer discards a working connection. The shared Wi-Fi manager clears readiness before reconnect work and handles IP loss as well as Wi-Fi disconnects.
+
+A cached address must return valid zones including the selected zone. Network changes and manual bridge selection fence the cache; ordinary checks do not rewrite flash. The local protocol does not provide an authenticated installation identity, so this remains trusted-LAN recovery, not server authentication. The auxiliary parking image has no networking changes.
+
+Regression coverage includes wake without DNS, failed periodic discovery, changed addresses/networks, unrelated zones, stale in-flight replies, corrupt cache records, flash-write coalescing and production Wi-Fi event ordering. Exact-artifact sleep/wake hardware evidence is recorded on the release PR; software checks alone do not establish that the tester's intermittent symptom is resolved.
+
+
 **HiPhi by Open Horizon Labs** — [hiphi.audio](https://hiphi.audio)
 
 Free for personal, noncommercial use under PolyForm Noncommercial 1.0.0.

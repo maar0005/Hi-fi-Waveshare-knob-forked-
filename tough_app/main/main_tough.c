@@ -79,7 +79,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
   case RK_NET_EVT_GOT_IP:
     ESP_LOGI(TAG, "WiFi connected with IP: %s", ip_opt ? ip_opt : "unknown");
     post_runtime_network_status(NULL);
-    bridge_client_set_network_ready(true);
     m5_platform_voice_set_zone_provider(bridge_client_get_current_zone_id);
     m5_platform_voice_network_ready();
     s_mdns_init_pending = true;
@@ -97,7 +96,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
     char msg[64];
     snprintf(msg, sizeof(msg), "WiFi: %s (%d/%d)", error, attempt, max);
     post_runtime_network_status(msg);
-    bridge_client_set_network_ready(false);
     break;
   }
 
@@ -108,7 +106,6 @@ void rk_net_evt_cb(rk_net_evt_t evt, const char *ip_opt) {
              platform_provisioning_ssid());
     touch_ui_post_network_status(msg);
     touch_ui_post_zone_name("WiFi Setup");
-    bridge_client_set_network_ready(false);
     atomic_store_explicit(&s_sta_server_pending, false, memory_order_release);
     break;
 
