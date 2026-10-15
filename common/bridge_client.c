@@ -703,6 +703,10 @@ static bool update_connection(void) {
         next.resolved = true;
         next.resolver = literal ? CONNECTION_RESOLVER_LITERAL : CONNECTION_RESOLVER_CACHE;
     }
+    /* Learn a legacy automatic IP's stable name while it is still reachable.
+     * Discovery failure here must never undo the successful direct probe. */
+    if (valid && literal && next.automatic && platform_mdns_is_ready())
+        platform_mdns_observe_bridge(token.bridge_base, &observed);
     if (!valid && (platform_mdns_is_ready() || (!next.automatic && literal))) {
         if (next.automatic) platform_mdns_observe_bridge(token.bridge_base, &observed);
         next.discovered = observed.seen;
@@ -750,7 +754,7 @@ static bool update_connection(void) {
     unlock_state();
     if (valid && next.selected_zone_available && network[0]) {
         cache = (platform_bridge_cache_t){.version = 1};
-        const char *selection = observed.seen ? observed.identity : token.bridge_base;
+        const char *selection = observed.seen && !observed.ambiguous ? observed.identity : token.bridge_base;
         rk_strlcpy(cache.selected, selection, sizeof(cache.selected));
         rk_strlcpy(cache.endpoint, next.endpoint, sizeof(cache.endpoint));
         rk_strlcpy(cache.network, network, sizeof(cache.network));

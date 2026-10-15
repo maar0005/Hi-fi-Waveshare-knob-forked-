@@ -327,4 +327,21 @@ static void test_disconnect_fences_inflight_probe(void) {
     assert(!update_connection());
     assert(!s_connection.reachable && !retained_cache.version);
 }
-int main(void) { test_wake_reuses_verified_address(); test_stale_cache_and_network_change(); test_disconnect_fences_inflight_probe(); test_refresh_keeps_working_address(); test_offline_never_queries(); test_now_playing_json_strings(); test_fixed_volume_response_and_zone_switch(); test_discovery_waits_for_initialization(); test_zone_cycle_wraps_without_copying_inventory(); test_partial_api_success_preserves_backoff(); test_zone_refresh_invalidates_old_readiness(); test_volume_uses_current_connection_evidence(); test_unresolved_then_recovered(); test_failed_and_stale_candidates(); }
+static void test_legacy_automatic_ip_keeps_hostname_recovery(void) {
+    reset("http://192.168.1.2:8088", true);
+    strcpy(fixture.value.zone_id, "roon:room");
+    http_body = "{\"zones\":[{\"zone_id\":\"roon:room\"}]}";
+    advertised.seen = true;
+    strcpy(advertised.identity, "http://nas2.local:8088");
+    strcpy(advertised.endpoint, "http://192.168.1.2:8088");
+    assert(update_connection());
+    assert(queued); /* Reusing an old IP must not prevent learning its durable name. */
+    { void (*cb)(void *) = queued; void *arg = queued_arg; queued = NULL; queued_arg = NULL; cb(arg); }
+    assert(strcmp(fixture.value.bridge_base, "http://nas2.local:8088") == 0);
+    assert(strcmp(retained_cache.selected, fixture.value.bridge_base) == 0);
+    memset(&s_connection, 0, sizeof(s_connection)); s_connection_network[0] = 0;
+    advertised = (platform_mdns_observation_t){0}; resolution_ok = false;
+    assert(update_connection()); /* Learned name and address survive restart together. */
+    assert(controller_connection_ready(&s_connection));
+}
+int main(void) { test_legacy_automatic_ip_keeps_hostname_recovery(); test_wake_reuses_verified_address(); test_stale_cache_and_network_change(); test_disconnect_fences_inflight_probe(); test_refresh_keeps_working_address(); test_offline_never_queries(); test_now_playing_json_strings(); test_fixed_volume_response_and_zone_switch(); test_discovery_waits_for_initialization(); test_zone_cycle_wraps_without_copying_inventory(); test_partial_api_success_preserves_backoff(); test_zone_refresh_invalidates_old_readiness(); test_volume_uses_current_connection_evidence(); test_unresolved_then_recovered(); test_failed_and_stale_candidates(); }
