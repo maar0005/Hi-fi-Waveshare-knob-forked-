@@ -6,7 +6,7 @@ This document applies the [Open Horizons](https://muness.com/posts/open-horizons
 
 ## Why This Project Exists
 
-This repository is the firmware for the **HiPhi controller family** — Dial, Frame, Slate, Joy, Tough, Dial Lab, Twist, Remote, and Kizz — which turn commodity ESP32 boards, most of them under $50, into purpose-built physical controllers for a hi-fi system. They control **Roon**, **Lyrion Music Server (LMS)**, and **OpenHome/UPnP** renderers through the Unified Hi-Fi Control bridge, so the source you run is a choice rather than a lock-in.
+This repository is a fork of the firmware for the **HiPhi controller family** that keeps only the **HiPhi Dial** on the Waveshare ESP32-S3 knob (~$50), turning it into a purpose-built physical controller for a hi-fi system that can also dim Home Assistant lights. They control **Roon**, **Lyrion Music Server (LMS)**, and **OpenHome/UPnP** renderers through the Unified Hi-Fi Control bridge, so the source you run is a choice rather than a lock-in.
 
 The point is a dedicated object rather than another app: something on the desk, the couch, or the wall that shows what is playing and changes it without a general-purpose screen in the way. It's a side project that demonstrates technology as a force-multiplier: taking off-the-shelf hardware and firmware expertise and compressing them into something non-developers can use.
 

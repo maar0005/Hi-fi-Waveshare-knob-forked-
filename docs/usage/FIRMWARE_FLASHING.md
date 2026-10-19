@@ -1,32 +1,10 @@
 # Firmware Flashing
 
-Choose the exact controller and revision at the [firmware center](https://firmware.hiphi.audio/). Every target has its own installer; a shared ESP32 chip family does not make firmware interchangeable. The command-line examples below are for **HiPhi Dial on the Waveshare ESP32-S3-Knob-Touch-LCD-1.8**. See the [target notes](../targets/README.md) for other boards.
+This fork builds firmware for **HiPhi Dial on the Waveshare ESP32-S3-Knob-Touch-LCD-1.8** and the parking image for that board's second ESP32. Flash it with `esptool.py` from this repository's releases.
 
-There are two methods:
-1. **Web Flasher** (recommended) - No tools to install; use desktop Chrome, Edge, or Firefox
-2. **esptool.py** - Command-line tool for advanced users
+The upstream web flasher at firmware.hiphi.audio installs upstream HiPhi firmware, which does not include this fork's changes (such as Home Assistant lights).
 
-## Web Flasher (Recommended)
-
-The easiest way to flash firmware. Works directly in your browser using the Web Serial API.
-
-### Requirements
-- **Browser**: A current desktop version of Chrome, Edge, or Firefox. Safari is not supported; iPhone, iPad, and Android cannot flash over USB.
-- **HTTPS**: Web Serial requires HTTPS. Choose a channel at [firmware.hiphi.audio](https://firmware.hiphi.audio/).
-- **USB cable**: Use a data-capable cable; charge-only cables cannot flash firmware.
-
-### Steps
-
-1. Choose a release channel and the exact controller. Check its release notes for physical-hardware status.
-2. Connect the board over USB. For Dial, turn on the power slider toward the USB-C port.
-3. Click the target’s **Flash** button and select its serial port. For Dial: Click **"Flash Dial main controller"**.
-4. Confirm the detected chip. Dial main firmware requires **ESP32-S3**; its auxiliary parking image requires **ESP32**. If the chip is wrong, cancel and flip the USB-C plug at the Dial end.
-5. Allow erase for a fresh install. Decline erase during an update on the same controller to retain Wi-Fi and settings.
-6. Wait for completion, then follow the setup instructions below.
-
-The browser installer writes individual components outside NVS when you decline erase. A downloaded **merged factory image** writes across NVS and removes settings even without a separate erase. Use the Flash button or the component command below for a settings-preserving update.
-
----
+Connect the board with a data-capable USB cable and turn on the power slider toward the USB-C port. The main firmware requires **ESP32-S3**; the auxiliary parking image requires **ESP32**. If esptool reports the wrong chip, flip the USB-C plug at the Dial end.
 
 ## esptool.py (Command Line)
 
@@ -40,7 +18,7 @@ pip install esptool
 
 ### Download Firmware
 
-Download all four component files **from the same release** for a complete first installation or a settings-preserving update. [Latest Stable](https://github.com/muness/roon-knob/releases/latest) excludes prereleases; use [all releases](https://github.com/muness/roon-knob/releases) when deliberately choosing Beta or Alpha:
+Download all four component files **from the same release** for a complete first installation or a settings-preserving update. [Latest release](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/releases/latest) excludes prereleases; use [all releases](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/releases) for prereleases:
 - `hiphi_dial_bootloader.bin`
 - `hiphi_dial_partition-table.bin`
 - `hiphi_dial_ota_data_initial.bin`
@@ -133,51 +111,7 @@ If the setup page does not appear, stay connected to the setup network and open 
 
 ---
 
-## Technical Reference: esptool-js
-
-The web flasher uses [esptool-js](https://github.com/espressif/esptool-js), Espressif's JavaScript implementation of esptool. It's wrapped by [ESP Web Tools](https://esphome.github.io/esp-web-tools/) which provides the user interface.
-
-### How It Works
-
-1. **Web Serial API**: Browser requests access to serial port
-2. **Bootloader Protocol**: esptool-js implements the ESP32 serial bootloader protocol
-3. **Flash Writing**: Binary is sent in chunks with checksums
-4. **Verification**: MD5 checksum verifies successful flash
-
-### Manifest Format
-
-ESP Web Tools uses JSON manifests to describe firmware:
-
-```json
-{
-  "name": "HiPhi Dial",
-  "version": "1.0.0",
-  "new_install_prompt_erase": true,
-  "builds": [{
-    "chipFamily": "ESP32-S3",
-    "parts": [{
-      "path": "hiphi_dial_bootloader.bin",
-      "offset": 0
-    }, {
-      "path": "hiphi_dial_partition-table.bin",
-      "offset": 32768
-    }, {
-      "path": "hiphi_dial_ota_data_initial.bin",
-      "offset": 53248
-    }, {
-      "path": "hiphi_dial.bin",
-      "offset": 65536
-    }]
-  }]
-}
-```
-
-Key fields:
-- `chipFamily`: Must match connected chip (ESP32, ESP32-S3, ESP32-C3, etc.)
-- `parts[].offset`: Flash address for each component. Keep all parts outside NVS to preserve settings; offset 0 merged factory images overwrite it.
-- `new_install_prompt_erase`: Ask user about erasing flash on new installs
-
-### Creating Merged Binaries
+## Creating Merged Binaries
 
 To create a merged binary from individual components:
 
@@ -194,9 +128,3 @@ esptool.py --chip esp32s3 merge_bin \
 ```
 
 This creates a single file that can be flashed at offset 0, containing all partitions at their correct addresses.
-
-## Maintaining Alpha versus Stable notes
-
-The Alpha flasher shows a comparison and UHC compatibility requirements before its device list. Its source is `web/assets/alpha-changelog.md`, a reviewed Markdown summary of the current alpha against the current Stable release. Update its version heading, UHC recommendation, feature bullets and hardware-testing status as part of each alpha release. An LLM can draft the text from the commits and release notes; a maintainer reviews it before publication.
-
-Site preparation renders this Markdown into static HTML for every released-alpha page and lightweight site preview. Stable, Beta and unreleased firmware previews do not inherit these claims. The alpha version must match the page version; publishing fails before writing pages when notes are stale or incomplete. CSS/JS asset versioning runs after rendering. No LLM call, backend access or client-side changelog fetch is needed to display the comparison.

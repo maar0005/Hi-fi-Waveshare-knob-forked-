@@ -1,45 +1,32 @@
 <img src="docs/images/hiphi-logo.png" alt="HiPhi" width="64" align="left" />
 
-# HiPhi ESP Firmware
+# HiPhi Dial firmware (Waveshare knob fork)
 
-[![Build](https://github.com/muness/roon-knob/actions/workflows/docker.yml/badge.svg)](https://github.com/muness/roon-knob/actions/workflows/docker.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/muness/roon-knob)](https://github.com/muness/roon-knob/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/muness/roon-knob/total)](https://github.com/muness/roon-knob/releases)
+[![Build](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/actions/workflows/docker.yml/badge.svg)](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/actions/workflows/docker.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/maar0005/Hi-fi-Waveshare-knob-forked-)](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/releases/latest)
 
-**HiPhi by Open Horizon Labs** — [hiphi.audio](https://hiphi.audio/) · [Flash firmware](https://firmware.hiphi.audio/)
+**HiPhi by Open Horizon Labs** — [hiphi.audio](https://hiphi.audio/) · Fork of [muness/roon-knob](https://github.com/muness/roon-knob)
 
-Dedicated hi-fi controllers built from commodity ESP32 hardware. A HiPhi controller sits on your desk, your couch, or your wall and does one thing well: show what is playing and let you change it — transport, volume, zones — without opening a phone or a laptop. This repository holds the firmware for the whole family. Each target is a different piece of hardware running the same shared control core, talking to the same bridge, [Unified Hi-Fi Control](https://github.com/open-horizon-labs/unified-hifi-control), which connects to Roon, Lyrion Music Server (LMS), and OpenHome/UPnP renderers.
+Dedicated hi-fi controllers built from commodity ESP32 hardware. A HiPhi controller sits on your desk, your couch, or your wall and does one thing well: show what is playing and let you change it — transport, volume, zones — without opening a phone or a laptop. This fork holds the firmware for one controller, the HiPhi Dial on the Waveshare ESP32-S3 knob, and adds Home Assistant light dimming. The other HiPhi controllers live in the upstream repository. The Dial talks to the bridge, [Unified Hi-Fi Control](https://github.com/open-horizon-labs/unified-hifi-control), which connects to Roon, Lyrion Music Server (LMS), and OpenHome/UPnP renderers.
 
 [![HiPhi Dial demo](docs/images/hiphi-dial-photo.jpg)](https://photos.app.goo.gl/s5LpWqBTaXRihmjh7)
 *Click to watch a video demo of the HiPhi Dial*
 
-> **Firmware maturity:** the current v2.7 prerelease is **Alpha** across every
-> target because its exact artifacts still need physical regression testing.
-> HiPhi Frame builds are available for early testing,
-> but its current shared-stack firmware has not completed equivalent hardware
-> regression coverage.
+> **Firmware maturity:** these builds are **Alpha**. The Home Assistant lights
+> feature has not yet been tested on physical hardware.
 
-## The Family
+## Hardware
 
-| Controller | Hardware | Flash |
+| Controller | Hardware | Firmware |
 |---|---|---|
-| **HiPhi Dial** | [Waveshare ESP32-S3-Knob-Touch-LCD-1.8](https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm) | [Flash Dial](https://firmware.hiphi.audio/stable/?target=dial) |
-| Dial auxiliary parking image | Waveshare knob, second ESP32 | [Flash auxiliary](https://firmware.hiphi.audio/stable/?target=knobaux) |
-| **HiPhi Frame** | Waveshare ESP32-S3-PhotoPainter | [Flash Frame](https://firmware.hiphi.audio/stable/?target=frame) |
-| **HiPhi Slate** | Waveshare ESP32-S3-RLCD-4.2 | [Flash Slate](https://firmware.hiphi.audio/stable/?target=rlcd) |
-| **HiPhi Joy** | M5Stack AtomS3 JoyStick K137 | [Flash Joy](https://firmware.hiphi.audio/stable/?target=joy) |
-| **HiPhi HALO** | innoelement HALO TOUCH USB Hub Dock (V2 board) | [Flash HALO](https://firmware.hiphi.audio/stable/?target=halo) |
-| **HiPhi Tough** | M5Stack Tough K034 | [Flash Tough](https://firmware.hiphi.audio/stable/?target=tough) |
-| **HiPhi Dial Lab** | M5Stack Dial K130-V11 | [Flash Dial Lab](https://firmware.hiphi.audio/beta/?target=m5dial) |
-| **HiPhi Twist** | M5StickS3 K150 | [Flash Twist](https://firmware.hiphi.audio/beta/?target=sticks3) |
-| **HiPhi Remote** | M5Stack StopWatch C152 | [Flash Remote](https://firmware.hiphi.audio/beta/?target=stopwatch) |
-| **Kizz** | M5StackChan K151 | [Flash Kizz](https://firmware.hiphi.audio/beta/?target=stackchan) |
+| **HiPhi Dial** | [Waveshare ESP32-S3-Knob-Touch-LCD-1.8](https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm) | [Releases](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/releases) |
+| Dial auxiliary parking image | Waveshare knob, second ESP32 | [Releases](https://github.com/maar0005/Hi-fi-Waveshare-knob-forked-/releases) |
 
-Pick a channel — Stable, Beta, or Alpha — from the [firmware channel chooser](https://firmware.hiphi.audio/). Flashing needs a current desktop version of Chrome, Edge, or Firefox; iPhone, iPad, and Android cannot flash over USB.
+Flash with `esptool.py`; see [firmware flashing](docs/usage/FIRMWARE_FLASHING.md). To keep Wi-Fi and settings, write only `hiphi_dial.bin` at `0x10000`. Automatic updates come from the bridge and install upstream firmware without this fork's changes.
 
 ## What You Need
 
-1. **Hardware**: one of the boards above. The Dial (~$50) is the flagship — buy it at [amazon](https://amzn.to/4pYZdiC) to support my work.
+1. **Hardware**: the Waveshare ESP32-S3-Knob-Touch-LCD-1.8 (~$50).
 2. **Music source**: Roon Core, Lyrion Music Server, or an OpenHome renderer on your network.
 3. **Docker host** (NAS, Raspberry Pi, always-on computer) to run the bridge.
 
@@ -47,7 +34,7 @@ Pick a channel — Stable, Beta, or Alpha — from the [firmware channel chooser
 
 ## Run the Bridge
 
-Every HiPhi controller talks to the same bridge, Unified Hi-Fi Control. Set it up once and every controller on your network can use it.
+The Dial talks to the bridge, Unified Hi-Fi Control. Set it up once and every controller on your network can use it.
 
 **Docker (recommended)**
 
@@ -81,23 +68,23 @@ Find "Unified Hi-Fi Control" in the extension list and install it from there (Ro
 
 Controllers find the bridge automatically over mDNS. Each controller remembers the selected bridge's name and resolves its current address when reconnecting, so an IP change does not normally require editing settings. See [connection recovery](docs/connection-recovery.md) for the status vocabulary and recovery behavior.
 
-## Per-target Guides
+## Guides
 
 - **HiPhi Dial** — [quick start, controls, and troubleshooting](docs/usage/DIAL.md)
-- **HiPhi Tough** — [build, flash, and controls](docs/dial/M5STACK.md)
-- **Frame, Slate, Joy, and the M5 betas** — [target notes index](docs/targets/README.md)
-- **All targets** — [firmware flashing](docs/usage/FIRMWARE_FLASHING.md), [Wi-Fi provisioning](docs/usage/WIFI_PROVISIONING.md), [OTA updates](docs/usage/OTA_UPDATES.md)
+- **Home Assistant lights** — [setup and use](docs/usage/HOME_ASSISTANT_LIGHTS.md)
+- **Target notes** — [Dial and auxiliary image](docs/targets/README.md)
+- **Setup** — [firmware flashing](docs/usage/FIRMWARE_FLASHING.md), [Wi-Fi provisioning](docs/usage/WIFI_PROVISIONING.md), [OTA updates](docs/usage/OTA_UPDATES.md)
 
 ## Features
 
-- Real-time now playing with album artwork on targets whose displays support it
-- Velocity-sensitive volume control on encoder targets
+- Real-time now playing with album artwork
+- Velocity-sensitive volume control
+- Library browsing, including Roon playlists (Menu → Library → Playlists)
+- Home Assistant light dimming from the knob (Menu → Lights)
 - Multi-zone support across Roon, LMS, and OpenHome
 - Automatic display dimming and sleep
-- Stable firmware update checks and user-started OTA installation on HiPhi Dial; other targets use USB unless their guide documents OTA
+- Bridge-served firmware update checks and user-started OTA installation (installs upstream firmware)
 - Wi-Fi setup via captive portal
-
-Kizz voice and wake detection are currently compiled out because no voice endpoint is available. Its touch playback controls, room selection, expressions, motion, and speaker cues remain enabled. See the [experimental voice build notes](docs/dev/KIZZ_VOICE.md).
 
 ## Development
 

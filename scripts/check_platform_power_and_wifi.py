@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard shared power snapshots and Wi-Fi scan coverage across every target."""
+"""Guard shared power snapshots and Wi-Fi scan coverage on the Dial."""
 
 from __future__ import annotations
 
@@ -88,51 +88,6 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "PLATFORM_POWER_CAP_VOLTAGE_EXPERIMENT",
         "platform_power_experiment_supported",
     ),
-    "frame_app/main/platform_display_frame.c": (
-        "void platform_power_snapshot",
-        "pmic_get_battery_percent()",
-        "PMIC_POWER_SOURCE_EXTERNAL",
-        "platform_power_diagnostics_enrich",
-    ),
-    "rlcd_app/main/platform_display_rlcd.c": (
-        "void platform_power_snapshot",
-        "rlcd_battery_percent()",
-        "platform_power_diagnostics_enrich",
-        "rlcd_power_manager_debug_enrich",
-        "platform_power_debug_arm_sleep",
-    ),
-    "atom_app/main/platform_display_atom.c": (
-        "void platform_power_snapshot",
-        "platform_power_diagnostics_enrich",
-    ),
-    "tough_app/main/platform_display_m5.c": (
-        "void platform_power_snapshot",
-        "platform_power_diagnostics_enrich",
-    ),
-    "m5_beta_app/main/platform_display_beta.c": (
-        "void platform_power_snapshot",
-        "m5_platform_power_snapshot(&snapshot)",
-        "platform_power_diagnostics_enrich",
-    ),
-    "common/m5_terminal_power.c": (
-        "platform_power_prepare_for_deep_sleep()",
-        "platform_input_shutdown()",
-        "wifi_mgr_stop()",
-        "m5_platform_power_off()",
-        "nvs_commit(handle)",
-        "platform_power_evidence_note_preflight(flags)",
-        "platform_power_evidence_note_entry(m5_platform_battery_level())",
-    ),
-    "components/m5_platform/m5_platform.cpp": (
-        "POWER_SNAPSHOT_CACHE_US",
-        "getBattery1Voltage()",
-        "getBattery2Voltage()",
-        "M5_PLATFORM_BOARD_DIAL",
-    ),
-    "rlcd_app/main/rlcd_battery.c": (
-        "RLCD_BATTERY_CHANNEL ADC_CHANNEL_3",
-        "RLCD_BATTERY_CACHE_US",
-    ),
     "idf_app/main/battery.c": (
         "BATTERY_SAMPLE_CACHE_MS 15000",
         "s_cached_voltage_valid",
@@ -190,131 +145,15 @@ REQUIRED: dict[str, tuple[str, ...]] = {
         "must not silently cancel it",
         "display_get_state() != DISPLAY_STATE_SLEEP",
     ),
-    "frame_app/main/captive_portal.c": (
-        '"wifi_portal_form.h"',
-        "#define PLATFORM_PORTAL_FRAME_DISPLAY_SETTINGS 1",
-        "#if PLATFORM_PORTAL_FRAME_DISPLAY_SETTINGS",
-        "rk_wifi_portal_scan_prepare",
-        "rk_wifi_portal_render_options",
-        "rk_wifi_portal_resolve_ssid",
-        "power_debug_web_register(s_server)",
-        "#define PORTAL_HTTPD_STACK_SIZE 16384",
-        "config.max_uri_handlers = 20",
-        "config.stack_size = PORTAL_HTTPD_STACK_SIZE;",
-        "httpd_resp_send_chunk(req, chunk, HTTPD_RESP_USE_STRLEN)",
-        "Portal stack headroom at request start",
-        "Portal stack headroom after render",
-        'name=\'show_ip\'',
-        "frame_display_preferences_set_show_ip(show_ip)",
-    ),
-    "frame_app/main/eink_ui.c": (
-        '"controller_utf8.h"',
-        "controller_utf8_decode_next(&cursor)",
-        "ART_CROP_LIMIT_PERCENT 10",
-        "ART_CACHE_SIZE ((ART_W * ART_H) / 2)",
-        '"eink_acep6", "smart"',
-        "Unexpected packed artwork size",
-        "Packed artwork ready for panel",
-        "New artwork unavailable; preserving the current panel",
-        "if (artwork_changed && now < s_ui.art_retry_after)",
-        "#define ART_RETRY_MAX_MS 60000",
-        "s_ui.art_retry_after = platform_millis() + s_ui.art_retry_delay",
-        "s_ui.art_retry_delay = next_delay > ART_RETRY_MAX_MS",
-        "const bool urgent_refresh = artwork_changed || s_ui.display_pref_dirty",
-        "New artwork bypassing the general render cooldown",
-        "if (!urgent_refresh && s_ui.initial_draw_done",
-        "s_ui.show_ip && s_ui.device_ip[0]",
-        "void eink_ui_post_device_ip(const char *ip)",
-    ),
-    "frame_app/main/main_frame.c": (
-        "eink_ui_post_device_ip(ip_opt)",
-        "eink_ui_post_show_ip(frame_display_preferences_show_ip())",
-        "eink_ui_post_device_ip(NULL)",
-    ),
-    "frame_app/main/platform_http_frame.c": (
-        "max_image_size = 2 * 1024 * 1024",
-        "content_length + 4096",
-        "next_size = max_image_size",
-    ),
-    "frame_app/main/frame_display_preferences.c": (
-        'NAMESPACE = "rk_frame"',
-        'SHOW_IP_KEY = "show_ip"',
-        "ATOMIC_VAR_INIT(true)",
-        "nvs_commit(handle)",
-    ),
-    "frame_app/main/frame_power_manager.c": (
-        "RTC_DATA_ATTR static frame_power_debug_rtc_t",
-        "frame_power_manager_debug_arm",
-        "s_power_debug_rtc.preflight_completions++",
-        "s_power_debug_rtc.entries++",
-        "platform_power_prepare_for_deep_sleep()",
-        ".provisioning = wifi_mgr_is_ap_mode()",
-        "pmic_prepare_for_deep_sleep()",
-        "platform_power_evidence_note_preflight(",
-        "platform_power_evidence_note_entry(pmic_get_battery_percent())",
-    ),
-    "rlcd_app/main/rlcd_power_manager.c": (
-        "RTC_DATA_ATTR static rlcd_power_debug_rtc_t",
-        "platform_power_prepare_for_deep_sleep()",
-        "esp_sleep_enable_ext1_wakeup_io(1ULL << RLCD_WAKE_GPIO",
-        "ble_hid_host_rlcd_prepare_for_sleep()",
-        "rlcd_display_prepare_for_sleep()",
-        "s_debug.preflight_completions++",
-        "s_debug.entries++",
-        "platform_power_evidence_note_preflight(s_debug.last_preflight_flags)",
-        "platform_power_evidence_note_entry(rlcd_battery_percent())",
-    ),
-    "rlcd_app/main/rlcd_display.c": (
-        "ST7305 SLPIN",
-        "esp_lcd_panel_io_tx_param(s_io, 0x10",
-    ),
-    "tough_app/main/captive_portal.c": (
-        '"wifi_portal_form.h"',
-        "rk_wifi_portal_scan_prepare",
-        "rk_wifi_portal_render_options",
-        "rk_wifi_portal_resolve_ssid",
-        "power_debug_web_register(s_server)",
-    ),
-    "atom_app/main/touch_ui.cpp": ("wifi_mgr_scan_start()",),
-    "tough_app/main/touch_ui.cpp": ("wifi_mgr_scan_start()",),
-    "m5_beta_app/main/touch_ui.cpp": ("wifi_mgr_scan_start()",),
-    "rlcd_app/main/CMakeLists.txt": (
-        '"../../frame_app/main/captive_portal.c"',
-        '"../../common/power_debug_web.c"',
-        '"../../common/wifi_portal_form.c"',
-        '"../../common/controller_text_ascii.c"',
-        "PLATFORM_PORTAL_FRAME_DISPLAY_SETTINGS=0",
-    ),
     "idf_app/main/CMakeLists.txt": (
         '"../../common/power_debug_web.c"',
         '"../../common/wifi_portal_form.c"',
     ),
-    "frame_app/main/CMakeLists.txt": (
-        '"../../common/power_debug_web.c"',
-        '"../../common/wifi_portal_form.c"',
-        '"../../common/controller_utf8.c"',
-        '"frame_display_preferences.c"',
-    ),
-    "tough_app/main/CMakeLists.txt": (
-        '"../../common/power_debug_web.c"',
-        '"../../common/wifi_portal_form.c"',
-    ),
-    "atom_app/main/CMakeLists.txt": (
-        '"../../common/power_debug_web.c"',
-        '"../../common/wifi_portal_form.c"',
-    ),
-    "m5_beta_app/main/CMakeLists.txt": (
-        '"../../common/power_debug_web.c"',
-        '"../../common/wifi_portal_form.c"',
-    ),
     ".github/RELEASE_TEMPLATE.md": (
-        "All ten physical controllers now scan for nearby 2.4 GHz",
+        "The Dial scans for nearby 2.4 GHz networks",
         "one shared power snapshot now supplies",
-        "Every physical controller exposes `/power-debug`",
+        "The Dial exposes `/power-debug`",
         "The Dial's `/power-debug/sleep` endpoint now runs one persistent power",
-        "All ten controllers retain the terminal-power evidence",
-        "could therefore\nkeep the processor awake indefinitely",
-        "HiPhi RLCD now sleeps the panel and processor",
     ),
 }
 
@@ -335,17 +174,6 @@ FORBIDDEN: dict[str, tuple[str, ...]] = {
     "idf_app/main/config_server.c": ("display_power_debug_snapshot",),
     ".github/RELEASE_TEMPLATE.md": (
         "HiPhi Dial captive page still uses manual SSID entry",
-    ),
-    "frame_app/main/frame_power_manager.c": (
-        "wifi_mgr_is_ap_mode() || captive_portal_is_running()",
-        "esp_sleep_enable_timer_wakeup",
-    ),
-    "tough_app/main/platform_display_m5.c": (
-        "out->external_power = true",
-        "USB-powered appliance",
-    ),
-    "rlcd_app/main/rlcd_power_manager.c": (
-        "!captive_portal_is_running()",
     ),
 }
 
@@ -368,25 +196,6 @@ def main() -> int:
             if needle in text:
                 failures.append(f"{relative}: forbidden legacy path {needle!r}")
 
-    frame_portal = (ROOT / "frame_app/main/captive_portal.c").read_text(
-        encoding="utf-8"
-    )
-    root_handler = frame_portal.split(
-        "static esp_err_t root_get_handler(httpd_req_t *req) {", 1
-    )[-1].split(
-        "static esp_err_t configure_post_handler(httpd_req_t *req) {", 1
-    )[0]
-    for legacy_render in (
-        "snprintf(html, html_size,",
-        "heap_caps_malloc(html_size",
-        "httpd_resp_send(req, html, strlen(html))",
-    ):
-        if legacy_render in root_handler:
-            failures.append(
-                "frame_app/main/captive_portal.c: root setup page must stream "
-                f"instead of using legacy monolithic render {legacy_render!r}"
-            )
-
     if failures:
         print("Platform power/Wi-Fi contract check FAILED", file=sys.stderr)
         for failure in failures:
@@ -395,8 +204,8 @@ def main() -> int:
 
     print("Platform power/Wi-Fi contract check passed")
     print("- one power snapshot feeds each shared controller poll cycle")
-    print("- every physical target exposes the shared non-blocking Wi-Fi scan")
-    print("- every physical target exposes the shared power-debug schema")
+    print("- the Dial exposes the shared non-blocking Wi-Fi scan")
+    print("- the Dial exposes the shared power-debug schema")
     return 0
 
 

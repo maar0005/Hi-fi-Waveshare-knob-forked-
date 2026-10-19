@@ -43,33 +43,27 @@ databases or Markdown TODO lists.
 
 ### Purpose
 
-This repository is the **HiPhi ESP firmware family**, not a single product. It
-turns commodity embedded hardware into approachable, dedicated hi-fi
-controllers. A controller should let someone perform routine listening without
+This repository is a fork of the **HiPhi ESP firmware family** that builds only
+the **HiPhi Dial** on the Waveshare ESP32-S3-Knob-Touch-LCD-1.8, plus the
+parking image for that board's second ESP32. The other HiPhi controllers were
+removed and remain upstream. It turns that knob into an approachable, dedicated
+hi-fi controller that can also dim Home Assistant lights. A controller should let someone perform routine listening without
 opening a general-purpose screen: see what is playing and control transport,
 volume, zones, playlists, and programs. Sources are Roon, Lyrion Music Server
 (LMS), and OpenHome/UPnP, reached through the
 [Unified Hi-Fi Control](https://github.com/open-horizon-labs/unified-hifi-control)
 bridge. The brand is **HiPhi by Open Horizon Labs**; the public site is
-[hiphi.audio](https://hiphi.audio/) and the flasher is
-[firmware.hiphi.audio](https://firmware.hiphi.audio/).
+[hiphi.audio](https://hiphi.audio/). This fork has no web flasher; its
+firmware is published as GitHub Release assets.
 
 ### Targets
 
-Do not default to the Dial. Every change should name the targets it touches.
+Every change should name the targets it touches.
 
 | Target dir | Slug | Product name | Hardware |
 |---|---|---|---|
 | `idf_app` | `hiphi-dial` | HiPhi Dial | Waveshare ESP32-S3-Knob-Touch-LCD-1.8 |
 | `knob_aux_app` | n/a | Dial auxiliary parking image | Waveshare knob, second ESP32 |
-| `frame_app` | `hiphi-frame` | HiPhi Frame | Waveshare ESP32-S3-PhotoPainter |
-| `rlcd_app` | `hiphi-rlcd` | HiPhi Slate | Waveshare ESP32-S3-RLCD-4.2 |
-| `atom_app` | `hiphi-joy` | HiPhi Joy | M5Stack AtomS3 JoyStick K137 |
-| `tough_app` | `hiphi-tough` | HiPhi Tough | M5Stack Tough K034 |
-| `m5_beta_app` (dial) | `hiphi-dial-beta` | HiPhi Dial Lab | M5Stack Dial K130-V11 |
-| `m5_beta_app` (sticks3) | `hiphi-sticks3-beta` | HiPhi Twist | M5StickS3 K150 |
-| `m5_beta_app` (stopwatch) | `hiphi-stopwatch-beta` | HiPhi Remote | M5Stack StopWatch C152 |
-| `m5_beta_app` (stackchan) | `hiphi-kizz-beta` | Kizz | M5StackChan K151 |
 
 Slugs are device identity. Changing one costs testers a re-provision, so treat
 them as fixed. Wire-contract strings (`_roonknob`, `X-Knob-Version`, `knob_id`,
@@ -95,24 +89,16 @@ Do not mass-edit existing files to add headers.
 
 - Factor a shared controller core for playback state, commands, configuration,
   connectivity, and recovery, cleanly decoupled from displays and physical input.
-- Drive adaptive UI from server-provided control payloads. Full HQPlayer zone
-  support is the first end-to-end implementation; Home Assistant follows the same
-  capability model rather than a parallel UI architecture.
-- Support Dial/round, HiPhi Frame/e-ink, M5 Tough, AtomS3 + Joystick, and future
-  encoder/joystick/button modules through explicit target and capability profiles.
-- Make BLE HID media-remote pairing a shared capability on compatible targets,
-  preserving the existing Frame behavior.
-- End the current program with testable beta firmware for both HiPhi Dial and
-  HiPhi Frame.
-- Explore playlist/program selection, including voice control, after the shared
-  control and adaptive-UI foundations are reliable.
+- Drive adaptive UI from server-provided control payloads.
+- Control Home Assistant lights directly from the Dial (implemented over Home
+  Assistant's REST API; see `docs/usage/HOME_ASSISTANT_LIGHTS.md`).
+- Keep BLE HID media-remote pairing working on the Dial.
+- Library browsing, including Roon playlists, through the bridge's collections API.
 
 ### Key Constraints
 
-- Preserve the proven Frame/e-ink and BLE HID behavior from historical mainline
-  commit `46599a6`. `origin/v4` is a salvage/reference source and the
-  known-working Dial build profile, not the provenance of those features and not
-  a wholesale merge target.
+- Preserve the proven BLE HID behavior. `origin/v4` is a salvage/reference
+  source and the known-working Dial build profile, not a wholesale merge target.
 - Hardware claims must be tied to an exact target/revision. Do not infer flash,
   PSRAM, display, touch, power, or pin capabilities from a product-family name.
 - Device-specific UI and input drivers may be compile-time inclusions; playback,
@@ -123,8 +109,8 @@ Do not mass-edit existing files to add headers.
 - CI release builds must use an optimized, evidence-backed configuration. The
   recovery baseline carries v4's non-debug build settings onto master (PERF
   optimization and a 16 MB merged image). The v2.5.2 Dial artifact establishes
-  ESP-IDF 5.5.5 as hardware-proven for Dial; each additional target, including
-  Frame, still requires exact-artifact hardware evidence.
+  ESP-IDF 5.5.5 as hardware-proven for Dial; each new Dial artifact still
+  requires exact-artifact hardware evidence.
 - This is a side project: prefer incremental factoring with shippable slices over
   an unbounded rewrite.
 
@@ -149,5 +135,4 @@ Do not mass-edit existing files to add headers.
 The maintainer approves architecture, merge, and release decisions. “Done” means
 the scoped issue is implemented, review/dissent output contracts are posted,
 automated checks pass, and any required exact-artifact hardware validation is
-recorded. Program completion additionally requires beta artifacts for Dial and
-Frame.
+recorded.

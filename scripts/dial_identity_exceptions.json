@@ -45,9 +45,7 @@
         "docs/meta/decisions/2025-12-20_DECISION_ROTATION.md",
         "docs/dev/IMPLEMENTATION_NOTES.md",
         "docs/dial/NETWORK_IDENTITY.md",
-        "docs/dial/BLE_HID.md",
-        "docs/esp/NETWORK_IDENTITY.md",
-        "docs/esp/BLE_HID.md"
+        "docs/dial/BLE_HID.md"
       ],
       "tokens": [
         "Roon Knob",
@@ -86,12 +84,7 @@
       "owner": "#163",
       "retirement": "Remove only after dual advertise/query compatibility is deployed and old consumers have migrated.",
       "path_globs": [
-        "common/platform/platform_mdns_esp.c",
-        "idf_app/main/platform_mdns_idf.c",
-        "frame_app/main/platform_mdns_frame.c",
-        "roku/README.md",
-        "roku/shared/components/DiscoveryTask.brs",
-        "roku/shared/source/Discovery.brs"
+        "common/platform/platform_mdns_esp.c"
       ],
       "tokens": [
         "_roonknob"
@@ -164,19 +157,6 @@
         "roon_knob"
       ],
       "line_regex": "(?:strcmp\\(app\\.project_name, \"roon_knob\"\\)|setup\\(\"roon_knob\",ESP_IMAGE_FLASH_SIZE_(?:8|16)MB\\))"
-    },
-    {
-      "id": "roku-logo-source-provenance",
-      "category": "historical-provenance",
-      "owner": "#273",
-      "retirement": "Permanent while the logo source remains the referenced repository asset.",
-      "path_globs": [
-        "roku/branding/README.md"
-      ],
-      "tokens": [
-        "roon-knob"
-      ],
-      "line_regex": "roon-knob/docs/images/hiphi-logo-512\\.png"
     }
   ],
   "required": [
@@ -206,11 +186,6 @@
       "min_count": 3
     },
     {
-      "path": "frame_app/main/platform_http_frame.c",
-      "contains": "esp_http_client_set_header(client, \"X-Device-Type\", platform_device_slug());",
-      "min_count": 3
-    },
-    {
       "path": "common/platform/platform_mdns_esp.c",
       "contains": "{\"product\", PLATFORM_MDNS_PRODUCT}"
     },
@@ -221,14 +196,6 @@
     {
       "path": "idf_app/sdkconfig.defaults",
       "contains": "CONFIG_LWIP_LOCAL_HOSTNAME=\"hiphi-dial\""
-    },
-    {
-      "path": "web/manifest-s3.json",
-      "contains": "\"name\": \"HiPhi Dial (Alpha)\""
-    },
-    {
-      "path": "web/manifest-s3.json",
-      "contains": "\"path\": \"hiphi_dial.bin\""
     },
     {
       "path": ".github/workflows/docker.yml",
@@ -244,55 +211,11 @@
     },
     {
       "path": ".github/workflows/docker.yml",
-      "contains": "needs: [test-shared, build-idf, build-frame, build-rlcd, build-atom, build-halo, build-tough, build-m5-betas, build-knob-aux]"
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "DIAL_APPLICATION_FILE=\"hiphi_dial-${PREVIEW_ID}.bin\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "DIAL_LEGACY_APPLICATION_FILE=\"roon_knob-${PREVIEW_ID}.bin\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/idf_app/build/hiphi_dial.bin \"pr-preview/${DIAL_APPLICATION_FILE}\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/idf_app/build/hiphi_dial.bin \"pr-preview/${DIAL_LEGACY_APPLICATION_FILE}\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "DIAL_FIRMWARE_FILE=\"hiphi_dial_merged-${PREVIEW_ID}.bin\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "DIAL_LEGACY_FIRMWARE_FILE=\"roon_knob_merged-${PREVIEW_ID}.bin\""
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/hiphi_dial_merged.bin gh-pages-build/"
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/hiphi_dial_merged.bin gh-pages-build/roon_knob_merged.bin"
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/idf_app/build/hiphi_dial.bin gh-pages-build/"
-    },
-    {
-      "path": ".github/workflows/docker.yml",
-      "contains": "cp dial-artifacts/idf_app/build/hiphi_dial.bin gh-pages-build/roon_knob.bin"
+      "contains": "needs: [test-shared, build-idf, build-knob-aux]"
     },
     {
       "path": "docs/usage/DIAL.md",
       "contains": "click \"Flash Dial main controller\""
-    },
-    {
-      "path": "docs/usage/FIRMWARE_FLASHING.md",
-      "contains": "Click **\"Flash Dial main controller\"**"
     },
     {
       "path": "docs/usage/GETTING_STARTED.md",
@@ -320,10 +243,6 @@
     }
   ],
   "forbidden": [
-    {
-      "path": "web/manifest-s3.json",
-      "contains": "roon_knob"
-    },
     {
       "path": "idf_app/main/platform_identity_idf.c",
       "contains": "roon-knob"

@@ -8,20 +8,14 @@ from pathlib import Path
 import shutil
 import subprocess
 
-PROJECTS = {
-    'dial': {'idf_app'}, 'frame': {'frame_app'},
-    'rlcd': {'rlcd_app', 'frame_app'},
-    'atom': {'atom_app', 'tough_app'}, 'tough': {'tough_app'},
-    'halo': {'halo_app', 'idf_app', 'tough_app'},
-    'm5': {'m5_beta_app', 'tough_app'}, 'aux': {'knob_aux_app'},
-}
+PROJECTS = {'dial': {'idf_app'}, 'aux': {'knob_aux_app'}}
 ALL_PROJECTS = set().union(*PROJECTS.values())
 
 def relevant(path, target):
     root = path.split('/')[0]
     if root in ALL_PROJECTS:
         return root in PROJECTS[target]
-    if root in {'docs', 'web'} or path == 'README.md':
+    if root == 'docs' or path == 'README.md':
         return False
     if root == 'tests':
         return path.startswith('tests/fixtures/')

@@ -10,18 +10,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED = {
-    "web/flash.html": (
-        "Battery and power work",
-        "Wi-Fi modem sleep",
-        "automatic Light-sleep",
-        "cached 16-sample ADC reading",
-        "power-debug view",
-        "turning the encoder wakes",
-        "one-time parking image",
-        "have not been measured yet",
-        "the other to the auxiliary ESP32",
-        "Cancel if it identifies an ESP32-S3",
-    ),
     ".github/RELEASE_TEMPLATE.md": (
         "two programmable\nprocessors",
         "Wi-Fi modem sleep",
@@ -39,10 +27,9 @@ REQUIRED = {
         "otherwise-unused auxiliary ESP32 once",
     ),
     ".github/workflows/docker.yml": (
-        "build-m5-betas, build-knob-aux]",
-        "Download Waveshare Dial auxiliary parking firmware",
-        "manifest-knob-aux-${PREVIEW_ID}.json",
-        "Flash HiPhi Dial + one-time auxiliary power step",
+        "needs: [test-shared, build-idf, build-knob-aux]",
+        "Download Waveshare auxiliary parking firmware",
+        "cp aux-artifacts/hiphi_knob_aux_park_merged.bin release-assets/",
     ),
 }
 

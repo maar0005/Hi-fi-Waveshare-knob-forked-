@@ -1,33 +1,14 @@
-# HiPhi v{{VERSION}}
+# HiPhi Dial v{{VERSION}}
 
-## Bridge recovery after sleep and Wi-Fi interruption
+Firmware for the Waveshare ESP32-S3-Knob-Touch-LCD-1.8 (HiPhi Dial) and its
+auxiliary parking image. This fork builds only the Waveshare knob.
 
-Upgrading from stable v2.5.2 also preserves configurations that were saved with a full V2 layout but a legacy V1 version marker. This exact hardware counterexample now has a shared migration regression.
+## Home Assistant lights and Roon playlists
 
-This alpha addresses #284: a Dial tester reported that the bridge was sometimes lost after wake until reboot. Every controller now uses the same recovery path. It retains the selected bridge name and a last-working numeric address, scoped to the Wi-Fi network, and checks that address before waiting for discovery again. A temporary discovery failure no longer discards a working connection. The shared Wi-Fi manager clears readiness before reconnect work and handles IP loss as well as Wi-Fi disconnects.
-
-A cached address must return valid zones including the selected zone. Network changes and manual bridge selection fence the cache; ordinary checks do not rewrite flash. The local protocol does not provide an authenticated installation identity, so this remains trusted-LAN recovery, not server authentication. The auxiliary parking image has no networking changes.
-
-Regression coverage includes wake without DNS, failed periodic discovery, changed addresses/networks, unrelated zones, stale in-flight replies, corrupt cache records, flash-write coalescing and production Wi-Fi event ordering. Exact-artifact sleep/wake hardware evidence is recorded on the release PR; software checks alone do not establish that the tester's intermittent symptom is resolved.
-
-
-**HiPhi by Open Horizon Labs** — [hiphi.audio](https://hiphi.audio)
-
-Free for personal, noncommercial use under PolyForm Noncommercial 1.0.0.
-Installers, integrators, and businesses need a commercial license (see
-[COMMERCIAL-LICENSE.md](https://github.com/muness/roon-knob/blob/master/COMMERCIAL-LICENSE.md)).
-
-This alpha adds an artwork-first touch interface to HiPhi Dial and HALO. Tap artwork to reveal Now playing and Menu; use Menu for Library, Zones and Settings. Touch lists scroll vertically, album covers scroll horizontally, and the knob browses on these pages. Artwork stays free of buttons, labels and rings. Zone selection now lives in Menu; the old overlapping header touch target is removed.
-
-Settings restores Wi-Fi and bridge configuration, saved networks, About, brightness and confirmed factory reset. Input-only library entries such as Search are hidden. Playback and library requests remain asynchronous so browsing does not stall input. The shared UI also keeps volume and battery hidden during background state updates in artwork mode, including targets that use the older controls layout.
-
-This release includes the #266 integration: safer updates and configuration, connection recovery and setup improvements, and wake-word detection disabled while no voice endpoint is available. It also includes the Roku clients already on master; those remain separate from ESP firmware.
-
-> **This is test firmware.** Install it yourself from the
-> [Alpha Web Flasher](https://firmware.hiphi.audio/alpha/). Alpha builds
-> are never sent through automatic OTA. The pre-release Dial artifact passed physical navigation and Menu touch checks. Every release image passes software checks, but new exact release images and other hardware still need physical regression testing. HALO's earlier touch redesign was tested; the final shared artifact is not yet physically qualified. We have not measured a battery-life improvement yet.
-
-The sections below retain the cumulative changes since stable v2.5.2, including the v2.6 work that was offered only as a prerelease and was never promoted to stable or automatic OTA. The firmware family now includes ten physical controllers, with HALO added to the earlier nine.
+When Home Assistant lights are configured on the Dial's web settings page
+(`http://<dial-ip>/ha`), Menu shows **Lights**. Turn the knob to dim the chosen
+light in 5% steps, drag the arc, or toggle it on and off. Roon playlists are
+under **Menu → Library → Playlists**. See `docs/usage/HOME_ASSISTANT_LIGHTS.md`.
 
 ## The Waveshare Dial now sleeps between jobs
 
@@ -92,154 +73,50 @@ measurement.
 The Dial works after installing the main firmware. For the lowest idle draw,
 also park the board's otherwise-unused auxiliary ESP32 once:
 
-1. Install the [HiPhi Dial firmware](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_dial_merged.bin) on the main ESP32-S3.
+1. Install the [HiPhi Dial firmware](https://github.com/{{REPOSITORY}}/releases/download/v{{VERSION}}/hiphi_dial_merged.bin) on the main ESP32-S3.
 2. Once, flip the USB-C cable to the other orientation and install the
-   [auxiliary ESP32 parking image](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_knob_aux_park_merged.bin).
+   [auxiliary ESP32 parking image](https://github.com/{{REPOSITORY}}/releases/download/v{{VERSION}}/hiphi_knob_aux_park_merged.bin).
+We have not measured a battery-life improvement yet.
 
-## Everything added since stable v2.5.2
+## Wi-Fi scanning and power debug
 
-### Shared controller foundation and ten exact hardware profiles
+The Dial scans for nearby 2.4 GHz networks during setup without stopping the
+setup access point, and shows the list in both captive setup and connected
+settings. You can pick a visible SSID, retry a scan, or type a hidden network.
 
-The work begun for v2.6 moved playback state, commands, configuration,
-connectivity, recovery, input routing, and presentation values behind shared
-controller interfaces rather than cloning the application for each board. It
-also restored HiPhi Frame on the current shared stack and added HiPhi RLCD,
-M5Stack Tough, AtomS3 JoyStick, M5Stack Dial v1.1, M5StickS3, StopWatch, and
-Kizz. Together with the Waveshare Dial, this alpha packages ten physical
-controller profiles.
+The Dial exposes `/power-debug` and `/power-debug?format=json` from its
+connected settings page, reporting the power source, active timeouts, display
+state, reset and wake cause, and its sleep capabilities.
 
-The Waveshare product is now named **HiPhi Dial** throughout the user-facing
-firmware while retaining compatibility with earlier controller identities and
-download names. The M5StackChan companion is now **Kizz**, in honor of Kismet;
-its `stackchan` build and asset stem remain for compatibility.
-
-### Safer configuration and browser updates
-
-Configuration ownership and provisioning are shared across targets, including
-Wi-Fi credentials, bridge endpoint, selected zone, controller name, and display
-and power policy. The shared BLE host separately owns its enabled preference,
-remembered remote, and bond state. Browser manifests no longer intentionally
-erase NVS during normal updates. Decline any browser erase prompt to preserve
-the device's saved configuration; merged factory images written at address
-`0x0` still erase it.
-
-### BLE media remotes on compatible targets
-
-BLE HOGP media-remote support is new compared with stable v2.5.2. It first
-appeared for HiPhi Dial and HiPhi Frame in the v2.6 prerelease work. This alpha
-also links the shared host into HiPhi RLCD and makes all three compatible
-targets sleep without intentionally forgetting the enabled setting, remembered
-remote, or Bluetooth bond.
-
-A paired Bluetooth Low Energy HOGP remote can control play/pause, previous,
-next, volume up, and volume down for the selected zone. Frame and RLCD enable
-the feature by default. Dial includes it but leaves it off until you enable
-**BLE Media Remote** in settings. This is support for a separate physical
-remote; it does not make the HiPhi controller a Bluetooth keyboard or speaker.
-
-### Nearby Wi-Fi scanning on every controller
-
-All ten physical controllers now scan for nearby 2.4 GHz networks during
-setup. The scan does not stop the setup access point. You can select a visible
-SSID, retry an empty or failed scan, or type a hidden network manually. The
-Waveshare Dial shows the list in both captive setup and connected settings.
-
-### One power-debug page across all hardware
-
-Every physical controller exposes `/power-debug` and
-`/power-debug?format=json` from its connected settings page. The shared report
-shows the power source, active timeouts, display state, reset and wake cause,
-and the sleep or power-off capabilities that the exact target implements.
-
-All ten controllers retain the terminal-power evidence described below. On
-the Waveshare Dial, `POST /power-debug/sleep` additionally starts the persistent
-software-voltage or external-profiler experiment described above; other exact
-targets report that early voltage sampling is unsupported until their qualified
-ADC or PMIC path is implemented. Every target writes a
-shared NVS lifecycle journal only at boot and terminal-sleep boundaries. Its
-bounded eight-event tail records the sequence, boot number, uptime, battery,
-preflight flags/error, reset cause, and wake cause for recent boot, attempt,
-error, preflight, and entry events. Summary counters and the previous-entry
-marker survive complete power loss. Dial, Frame, and RLCD additionally retain
-fast RTC evidence across processor Deep-sleep. The endpoint is passive: it does
-no background polling when nobody opens it.
-
-After the network clock synchronizes, each journal event also carries a UTC
-Unix timestamp and an ISO 8601 UTC rendering. Events written earlier in the
-same boot are backfilled from their monotonic uptime. Until synchronization,
-the endpoint reports the timestamp as unavailable instead of fabricating one.
-
-The M5-family targets now share one terminal preflight instead of jumping
-straight from a UI timeout into a board-specific power call. It removes the
-automatic Light-sleep timer wake, stops input and Wi-Fi, records durable
-evidence, and only then invokes the exact board's M5Unified power-off path.
-Tough now uses its actual AXP192 battery/VBUS state rather than being wrongly
-classified as an always-plugged appliance. AtomS3 JoyStick now reports its two
-base battery inputs through the STM32 and uses the physical power switch/reset
-as its recovery path.
-
-### HiPhi Frame now enters processor Deep-sleep
-
-On battery, a stopped and idle Frame now shuts down BLE and Wi-Fi, sleeps its
-e-paper controller, disables the four AXP2101 e-paper LDO rails, and puts the
-ESP32-S3 into Deep-sleep. Only the KEY input wakes it; the old periodic
-30-minute timer wake is removed. This alpha also fixes a blocker that mistook the normal
-connected settings server for active Wi-Fi provisioning and could therefore
-keep the processor awake indefinitely. The code path and retained wake evidence
-are implemented; actual PMIC rail current still needs measurement on the
-release image.
-
-### HiPhi RLCD now sleeps the panel and processor
-
-After its configured battery idle timeout, the Waveshare ESP32-S3-RLCD-4.2
-stops BLE and Wi-Fi, sends the ST7305 its documented Sleep In command, and puts
-the ESP32-S3 into Deep-sleep. Press KEY to wake it. The `/power-debug` page has
-the same retained entry and wake evidence as Dial and Frame.
-
-The board's PWR button controls a separate hardware power latch that firmware
-cannot switch off. The alpha now reads and caches the documented GPIO4
-three-to-one battery divider, but that ADC still cannot distinguish USB from
-battery power, so RLCD applies the battery idle policy even while USB is
-attached. Board-level sleep current and runtime remain unmeasured until the
-release image is tested with an external meter.
-
-## Choose your hardware and firmware
-
-The firmware profile is tied to the exact model or SKU below. Do not substitute
-a similarly named revision.
+## Hardware
 
 | HiPhi controller | Exact hardware | Buy from the manufacturer | Firmware |
 | --- | --- | --- | --- |
-| **HiPhi Dial** | Waveshare ESP32-S3-Knob-Touch-LCD-1.8; choose a battery-included variant for portable use | [Waveshare](https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm) | [Main](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_dial_merged.bin) + [auxiliary parking image](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_knob_aux_park_merged.bin) |
-| **HiPhi Frame** | Waveshare ESP32-S3-PhotoPainter, 7.3-inch E6 color e-paper | [Waveshare](https://www.waveshare.com/product/esp32-s3-photopainter.htm) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_frame_merged.bin) |
-| **HiPhi Slate** | Waveshare ESP32-S3-RLCD-4.2 | [Waveshare](https://www.waveshare.com/esp32-s3-rlcd-4.2.htm) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_rlcd_merged.bin) |
-| **HiPhi HALO** | innoelement HALO TOUCH USB Hub Dock, V2 board | [innoelement](https://www.tindie.com/products/johnson/halo-touch-usb-hub-dock-with-clock-v2/) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_halo_merged.bin) |
-| **HiPhi Joy** | M5Atom JoyStick with M5AtomS3, SKU K137 | [M5Stack](https://shop.m5stack.com/products/atom-joystick-with-m5atoms3) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_joy_merged.bin) |
-| **HiPhi Tough** | M5Stack Tough, SKU K034 | [M5Stack](https://shop.m5stack.com/products/m5stack-tough-esp32-iot-development-board-kit) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_tough_merged.bin) |
-| **HiPhi Dial Lab** | M5Stack Dial v1.1, SKU K130-V11 | [M5Stack](https://shop.m5stack.com/products/m5stack-dial-v1-1) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_m5dial_merged.bin) |
-| **HiPhi Twist** | M5StickS3, SKU K150 | [M5Stack](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_sticks3_merged.bin) |
-| **HiPhi Remote** | M5Stack StopWatch, SKU C152 | [M5Stack](https://shop.m5stack.com/products/m5stack-stopwatch-dev-kit-esp32-s3) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_stopwatch_merged.bin) |
-| **Kizz Playback Companion** | M5StackChan robot, SKU K151; no remote-control bundle required | [M5Stack](https://shop.m5stack.com/products/stackchan-kawaii-co-created-open-source-ai-desktop-robot) | [Download](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/hiphi_stackchan_merged.bin) |
+| **HiPhi Dial** | Waveshare ESP32-S3-Knob-Touch-LCD-1.8; choose a battery-included variant for portable use | [Waveshare](https://www.waveshare.com/esp32-s3-knob-touch-lcd-1.8.htm) | [Main](https://github.com/{{REPOSITORY}}/releases/download/v{{VERSION}}/hiphi_dial_merged.bin) + [auxiliary parking image](https://github.com/{{REPOSITORY}}/releases/download/v{{VERSION}}/hiphi_knob_aux_park_merged.bin) |
 
-The M5 Dial image is for the current Dial v1.1 (K130-V11), not the end-of-life
-original Dial (K130). The auxiliary parking image belongs to the Waveshare
-HiPhi Dial; it is not an eleventh controller.
+The auxiliary parking image belongs to the HiPhi Dial's second chip; it is not
+a separate controller.
 
-[Download SHA-256 checksums](https://github.com/muness/roon-knob/releases/download/v{{VERSION}}/SHA256SUMS.txt)
+[Download SHA-256 checksums](https://github.com/{{REPOSITORY}}/releases/download/v{{VERSION}}/SHA256SUMS.txt)
 
-## Install this alpha
+## Install
 
-Use the [Alpha Web Flasher](https://firmware.hiphi.audio/alpha/), choose
-your exact hardware, and decline the erase option if you want to keep existing
-Wi-Fi and controller settings. The merged `.bin` downloads above are factory
-images; writing one at address `0x0` erases saved settings.
-
-The stable web flasher and stable OTA feed do not offer this alpha. Return to
-the Alpha Web Flasher to install a later test build.
-
-If you run the companion control service in Docker Compose, update it with:
+To update while keeping Wi-Fi and controller settings, write only the
+application image at `0x10000`:
 
 ```console
-docker compose pull
-docker compose up -d
+esptool.py --chip esp32s3 write_flash 0x10000 hiphi_dial.bin
 ```
+
+The merged `.bin` downloads are factory images; writing one at address `0x0`
+erases saved settings.
+
+Automatic updates come from the Unified Hi-Fi Control bridge, not from this
+repository's releases, so an automatic update installs upstream HiPhi firmware
+without this fork's changes.
+
+**HiPhi by Open Horizon Labs** — [hiphi.audio](https://hiphi.audio)
+
+Free for personal, noncommercial use under PolyForm Noncommercial 1.0.0.
+Installers, integrators, and businesses need a commercial license (see
+[COMMERCIAL-LICENSE.md](https://github.com/muness/roon-knob/blob/master/COMMERCIAL-LICENSE.md)).

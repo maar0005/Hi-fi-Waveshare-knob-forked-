@@ -10,7 +10,7 @@ a BLE keyboard/media controller. The two roles are opposites:
 
 | Role | This firmware | Peer |
 | --- | --- | --- |
-| BLE HID host | HiPhi Frame or HiPhi Dial | Physical media remote |
+| BLE HID host | HiPhi Dial | Physical media remote |
 | BLE HID device | Not implemented | Phone, computer, or TV |
 
 ESP32-S3 supports Bluetooth LE but not Classic Bluetooth. This feature neither
@@ -35,14 +35,12 @@ specific remote.
 
 ## Target behavior
 
-- **HiPhi Frame:** enabled by default to preserve its established behavior.
 - **HiPhi Dial:** compiled into the normal ESP32-S3 firmware but disabled by
   default. Enable it from the connected device's settings page.
-- Pairing, enablement, and the remembered remote are stored only in that
-  device's local NVS. Nothing is copied or synchronized between Frame and
-  Dial.
+- Pairing, enablement, and the remembered remote are stored only in the
+  device's local NVS.
 
-Both targets expose scan, pair, connection status, disable, and forget
+The Dial exposes scan, pair, connection status, disable, and forget
 operations through target-owned settings. Display code remains target-specific;
 the shared Bluetooth component never calls e-ink or LVGL APIs.
 
