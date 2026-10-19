@@ -4,6 +4,7 @@
 #include "config_server.h"
 #include "display_sleep.h"
 #include "font_manager.h"
+#include "home_assistant_dial.h"
 #include "ota_update.h"
 #include "platform/platform_http.h"
 #include "platform/platform_input.h"
@@ -422,6 +423,7 @@ void app_main(void) {
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+    home_assistant_dial_init();
 
     /* A voltage-curve timer wake initializes only NVS and the ADC. Completed,
      * manual, or unexpected wakes fall through to the normal application. */

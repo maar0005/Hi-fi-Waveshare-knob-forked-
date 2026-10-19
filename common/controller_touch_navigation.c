@@ -6,6 +6,7 @@
 #include "controller_library.h"
 #include "controller_navigation.h"
 #include "lvgl.h"
+#include "platform/platform_lights.h"
 #include "platform/platform_touch_navigation.h"
 #include "portal_brand.h"
 #include "platform/platform_identity.h"
@@ -85,6 +86,11 @@ static int pending_mutation = -1;
 static unsigned pending_mutation_generation;
 static char pending_ref[513];
 static int64_t mutation_sent_ms;
+/* Lights: light_index < 0 shows the list; otherwise that light's dimmer. */
+static int light_index = -1, light_focus;
+static uint32_t lights_revision;
+static int64_t lights_refresh_ms;
+static lv_obj_t *light_arc, *light_value, *light_status, *light_toggle;
 static void render(void);
 static bool submit(int kind, const char *ref, const char *image,
                    int image_index);
@@ -199,6 +205,31 @@ static void button_text(lv_obj_t *button, const char *text) {
   lv_label_set_text(child, text);
   lv_obj_center(child);
 }
+/* Menu rows: Library, Zone, [Lights], Settings. */
+static int menu_lights_row(void) { return platform_lights_count() > 0 ? 2 : -1; }
+static int menu_settings_row(void) { return platform_lights_count() > 0 ? 3 : 2; }
+static void refresh_lights(void) {
+  lights_refresh_ms = esp_timer_get_time() / 1000;
+  if (light_index >= 0)
+    platform_lights_refresh(light_index);
+  else
+    for (int i = 0; i < platform_lights_count(); i++)
+      platform_lights_refresh(i);
+}
+static void light_summary(const platform_light_view_t *v, char *out, size_t n) {
+  if (*v->notice)
+    snprintf(out, n, "%s", v->notice);
+  else if (!v->known)
+    snprintf(out, n, "Checking…");
+  else if (!v->available)
+    snprintf(out, n, "Unavailable");
+  else if (!v->on)
+    snprintf(out, n, "Off");
+  else if (v->dimmable)
+    snprintf(out, n, "On · %d%%", v->brightness_pct);
+  else
+    snprintf(out, n, "On");
+}
 static void change_screen(int next) {
   screen = next;
   platform_touch_screen_changed((controller_screen_t)screen);
@@ -233,6 +264,12 @@ static void change_screen(int next) {
   if (screen == CONTROLLER_SCREEN_LIBRARY) {
     /* Parent/page changes are deferred while an old network request drains. */
     pending_browse = true;
+  }
+  if (screen == CONTROLLER_SCREEN_LIGHTS) {
+    if (light_index >= platform_lights_count())
+      light_index = -1;
+    refresh_lights();
+    lights_revision = platform_lights_revision();
   }
   render();
 }
@@ -388,6 +425,8 @@ enum {
   ACTION_WIFI_DETAILS,
   ACTION_DEVICE_CONTROLS,
   ACTION_FORGET_NETWORK_CONFIRM,
+  ACTION_LIGHTS,
+  ACTION_LIGHT_TOGGLE,
   ACTION_USE_NETWORK = 1000,
   ACTION_FORGET_NETWORK = 1100,
   ACTION_ROW = 100
@@ -575,8 +614,20 @@ static void tap(lv_event_t *event) {
     return;
   }
   if (action == ACTION_SETTINGS) {
-    menu_index = 2;
+    menu_index = menu_settings_row();
     change_screen(CONTROLLER_SCREEN_SETTINGS);
+    return;
+  }
+  if (action == ACTION_LIGHTS) {
+    menu_index = menu_lights_row();
+    /* A single light needs no list: open its dimmer directly. */
+    light_index = platform_lights_count() == 1 ? 0 : -1;
+    change_screen(CONTROLLER_SCREEN_LIGHTS);
+    return;
+  }
+  if (action == ACTION_LIGHT_TOGGLE && screen == CONTROLLER_SCREEN_LIGHTS &&
+      light_index >= 0) {
+    platform_lights_toggle(light_index);
     return;
   }
   if (action == ACTION_CONTROLS) {
@@ -594,8 +645,23 @@ static void tap(lv_event_t *event) {
     }
     if (screen == CONTROLLER_SCREEN_LIBRARY)
       back_action();
-    else
+    else if (screen == CONTROLLER_SCREEN_LIGHTS && light_index >= 0 &&
+             platform_lights_count() > 1) {
+      light_focus = light_index;
+      light_index = -1;
+      refresh_lights();
+      render();
+    } else
       change_screen(CONTROLLER_SCREEN_MENU);
+    return;
+  }
+  if (screen == CONTROLLER_SCREEN_LIGHTS && action >= ACTION_ROW) {
+    int i = action - ACTION_ROW;
+    if (light_index < 0 && i < platform_lights_count()) {
+      light_index = light_focus = i;
+      refresh_lights();
+      render();
+    }
     return;
   }
   if (screen == CONTROLLER_SCREEN_ZONES && action >= ACTION_ROW) {
@@ -719,6 +785,8 @@ static void list_scroll(lv_event_t *event) {
     setting_index = nearest;
   else if (screen == CONTROLLER_SCREEN_ZONES)
     zone_index = nearest;
+  else if (screen == CONTROLLER_SCREEN_LIGHTS)
+    light_focus = nearest;
   for (int i = 0; i < BRIDGE_CLIENT_MAX_ZONES + 1; i++)
     if (rows[i])
       lv_obj_set_style_bg_color(
@@ -730,6 +798,41 @@ static void brightness_changed(lv_event_t *event) {
   lv_label_set_text_fmt(lv_event_get_user_data(event), "%d%%", brightness);
   brightness_dirty = true;
   brightness_changed_ms = esp_timer_get_time() / 1000;
+}
+/* Updates the dimmer in place; rebuilding would interrupt an arc drag. */
+static void update_light_widgets(void) {
+  platform_light_view_t v;
+  if (!light_arc || light_index < 0 || !platform_lights_view(light_index, &v))
+    return;
+  int shown = v.on ? (v.dimmable ? v.brightness_pct : 100) : 0;
+  if (!lv_obj_has_state(light_arc, LV_STATE_PRESSED))
+    lv_arc_set_value(light_arc, shown);
+  if (v.dimmable && v.available)
+    lv_obj_add_flag(light_arc, LV_OBJ_FLAG_CLICKABLE);
+  else
+    lv_obj_remove_flag(light_arc, LV_OBJ_FLAG_CLICKABLE);
+  char text[PLATFORM_LIGHTS_NOTICE_MAX + 16];
+  if (v.known && v.on && v.dimmable)
+    snprintf(text, sizeof(text), "%d%%", v.brightness_pct);
+  else
+    snprintf(text, sizeof(text), "%s", !v.known ? "–" : v.on ? "On" : "Off");
+  if (strcmp(lv_label_get_text(light_value), text))
+    lv_label_set_text(light_value, text);
+  if (*v.notice)
+    snprintf(text, sizeof(text), "%s", v.notice);
+  else if (v.known && !v.available)
+    snprintf(text, sizeof(text), "Unavailable");
+  else
+    snprintf(text, sizeof(text), "%s", v.busy ? "Sending…" : v.dimmable ? "Turn to dim" : "");
+  if (strcmp(lv_label_get_text(light_status), text))
+    lv_label_set_text(light_status, text);
+  button_text(light_toggle, v.on ? "Turn off" : "Turn on");
+}
+static void light_arc_changed(lv_event_t *event) {
+  if (rebuilding || light_index < 0)
+    return;
+  platform_lights_set_brightness(light_index,
+                                 lv_arc_get_value(lv_event_get_target(event)));
 }
 static void carousel_end(lv_event_t *e) {
   (void)e;
@@ -817,6 +920,7 @@ static void render(void) {
   lv_obj_clean(overlay);
   scroller = NULL;
   entry = detail_label = NULL;
+  light_arc = light_value = light_status = light_toggle = NULL;
   if (screen == CONTROLLER_SCREEN_ARTWORK && recovery_active) {
     lv_obj_add_flag(home_button, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(art_touch, LV_OBJ_FLAG_HIDDEN);
@@ -888,9 +992,61 @@ static void render(void) {
       if (!strcmp(zs[i].id, current))
         snprintf(name, sizeof(name), "Zone: %s", zs[i].name);
     list_row(name, NULL, ACTION_ZONES, 1);
-    list_row("Settings", NULL, ACTION_SETTINGS, 2);
+    if (menu_lights_row() >= 0)
+      list_row("Lights", NULL, ACTION_LIGHTS, menu_lights_row());
+    list_row("Settings", NULL, ACTION_SETTINGS, menu_settings_row());
 
     focus_row(menu_index);
+  } else if (screen == CONTROLLER_SCREEN_LIGHTS && light_index >= 0) {
+    platform_light_view_t v = {0};
+    platform_lights_view(light_index, &v);
+    lv_label_set_text(heading, *v.name ? v.name : "Light");
+    lv_obj_add_flag(scroller, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(subtitle, "");
+    light_arc = lv_arc_create(overlay);
+    lv_obj_set_size(light_arc, 168, 168);
+    lv_obj_align(light_arc, LV_ALIGN_TOP_MID, 0, 106);
+    lv_arc_set_range(light_arc, 0, 100);
+    lv_arc_set_bg_angles(light_arc, 135, 45);
+    lv_obj_set_style_arc_width(light_arc, 14, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(light_arc, 14, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(light_arc, lv_color_hex(0x252525), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(light_arc, lv_color_hex(0xf2c46d), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(light_arc, lv_color_hex(0xd7e8f4), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(light_arc, 3, LV_PART_KNOB);
+    lv_obj_add_event_cb(light_arc, light_arc_changed, LV_EVENT_VALUE_CHANGED, NULL);
+    light_value = lv_label_create(light_arc);
+    lv_obj_set_style_text_font(light_value, platform_touch_font_normal(), 0);
+    lv_obj_set_style_text_color(light_value, lv_color_hex(0xeeeeee), 0);
+    lv_label_set_text(light_value, "");
+    lv_obj_align(light_value, LV_ALIGN_CENTER, 0, -10);
+    light_status = lv_label_create(light_arc);
+    lv_obj_set_width(light_status, 120);
+    lv_obj_set_style_text_font(light_status, platform_touch_font_small(), 0);
+    lv_obj_set_style_text_color(light_status, lv_color_hex(0xb8c4cd), 0);
+    lv_obj_set_style_text_align(light_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(light_status, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(light_status, "");
+    lv_obj_align(light_status, LV_ALIGN_CENTER, 0, 30);
+    light_toggle = button(overlay, 0, 278, 120, ACTION_LIGHT_TOGGLE);
+    update_light_widgets();
+  } else if (screen == CONTROLLER_SCREEN_LIGHTS) {
+    lv_label_set_text(heading, "Lights");
+    int count = platform_lights_count();
+    for (int i = 0; i < count; i++) {
+      platform_light_view_t v = {0};
+      char detail[PLATFORM_LIGHTS_NOTICE_MAX];
+      platform_lights_view(i, &v);
+      light_summary(&v, detail, sizeof(detail));
+      list_row(*v.name ? v.name : "Light", detail, ACTION_ROW + i, i);
+    }
+    if (!count)
+      lv_label_set_text(subtitle, "Add lights in web settings");
+    else
+      lv_label_set_text(subtitle, "Tap a light to dim it");
+    if (light_focus >= count)
+      light_focus = 0;
+    focus_row(light_focus);
   } else if (screen == CONTROLLER_SCREEN_ZONES) {
     lv_label_set_text(heading, "Pick a zone");
     for (int i = 0; i < zone_count; i++)
@@ -1353,6 +1509,28 @@ void controller_touch_navigation_process(void) {
     }
   }
   int64_t clock_ms = esp_timer_get_time() / 1000;
+  if (screen == CONTROLLER_SCREEN_LIGHTS) {
+    /* Pick up changes made elsewhere (wall switch, Home Assistant app). */
+    if (clock_ms - lights_refresh_ms >= 10000)
+      refresh_lights();
+    uint32_t revision = platform_lights_revision();
+    if (revision != lights_revision) {
+      lights_revision = revision;
+      if (light_index >= 0)
+        update_light_widgets();
+      else
+        for (int i = 0; i < platform_lights_count() && rows[i]; i++) {
+          platform_light_view_t v;
+          char detail[PLATFORM_LIGHTS_NOTICE_MAX];
+          if (!platform_lights_view(i, &v))
+            continue;
+          light_summary(&v, detail, sizeof(detail));
+          lv_obj_t *text = lv_obj_get_child(rows[i], 1);
+          if (text && strcmp(lv_label_get_text(text), detail))
+            lv_label_set_text(text, detail);
+        }
+    }
+  }
   if (brightness_dirty && clock_ms - brightness_changed_ms >= 700) {
     brightness_dirty = false;
     bool saved = platform_touch_save_brightness(brightness);
@@ -1423,9 +1601,30 @@ bool controller_touch_navigation_encoder(int delta) {
     menu_index += delta;
     if (menu_index < 0)
       menu_index = 0;
-    if (menu_index > 2)
-      menu_index = 2;
+    if (menu_index > menu_settings_row())
+      menu_index = menu_settings_row();
     focus_row(menu_index);
+    return true;
+  }
+  if (screen == CONTROLLER_SCREEN_LIGHTS) {
+    platform_light_view_t v;
+    if (light_index < 0) {
+      int last = platform_lights_count() - 1;
+      light_focus += delta;
+      if (light_focus > last)
+        light_focus = last;
+      if (light_focus < 0)
+        light_focus = 0;
+      focus_row(light_focus);
+    } else if (platform_lights_view(light_index, &v) && v.available) {
+      /* 5% per detent from the optimistic view, so fast turns accumulate.
+       * Turning down to 0 switches the light off. */
+      int base = v.on ? (v.dimmable ? v.brightness_pct : 100) : 0;
+      long next = v.dimmable ? base + (long)delta * 5 : (delta > 0 ? 100 : 0);
+      next = next < 0 ? 0 : next > 100 ? 100 : next;
+      if (next != base)
+        platform_lights_set_brightness(light_index, (int)next);
+    }
     return true;
   }
   if (screen == CONTROLLER_SCREEN_ZONES || ui_is_zone_picker_visible()) {

@@ -12,6 +12,7 @@
 #include "power_debug_web.h"
 #include "platform/platform_mdns.h"
 #include "bridge_client.h"
+#include "home_assistant_dial.h"
 #include "rk_ble_hid_host.h"
 #include "wifi_manager.h"
 #include "wifi_portal_form.h"
@@ -67,6 +68,7 @@ static const char *HTML_CONFIG =
     "<h1>Settings</h1>"
     "<p class='info'>Configure your " PLATFORM_PORTAL_PRODUCT_SLUG " settings</p>"
     "<p><a href='/ble'>BLE Media Remote settings</a></p>"
+    "<p><a href='/ha'>Home Assistant lights</a></p>"
     "<p><a href='/power-debug'>Power debug evidence</a></p>"
     "<div class='current'>"
     "<strong>Current Unified Hi-Fi Control:</strong> %s"
@@ -276,6 +278,167 @@ static esp_err_t config_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, html, strlen(html));
     free(html);
     free(render);
+    return ESP_OK;
+}
+
+#define HA_FORM_MAX_BYTES 4096
+
+/* Light rows are rendered into the page; values come from validated NVS. */
+static void send_ha_page(httpd_req_t *req, const char *status, const char *notice,
+                         bool error) {
+    struct ha_render {
+        ha_lights_config_t config;
+        char rows[HA_LIGHTS_MAX * 640];
+        char url[HA_LIGHTS_URL_MAX * 6], notice[768], summary[96];
+    } *render = heap_caps_calloc(1, sizeof(*render), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    const size_t html_size = 16384;
+    char *html = render ? heap_caps_malloc(html_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : NULL;
+    if (!render || !html) {
+        free(render);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return;
+    }
+    bool has_token = false;
+    home_assistant_dial_config(&render->config, &has_token);
+    html_escape(render->config.base_url, render->url, sizeof(render->url));
+    size_t pos = 0;
+    for (int i = 0; i < HA_LIGHTS_MAX; i++) {
+        char entity[HA_LIGHTS_ENTITY_MAX * 6] = "", name[HA_LIGHTS_NAME_MAX * 6] = "";
+        if (i < render->config.count) {
+            html_escape(render->config.lights[i].entity_id, entity, sizeof(entity));
+            html_escape(render->config.lights[i].name, name, sizeof(name));
+        }
+        int written = snprintf(render->rows + pos, sizeof(render->rows) - pos,
+            "<label>Light %d</label>"
+            "<input type='text' name='e%d' maxlength='63' value='%s' placeholder='light.living_room' "
+            "pattern='light\\.[a-z0-9_]+' autocapitalize='none' autocorrect='off' spellcheck='false'>"
+            "<input type='text' name='n%d' maxlength='32' value='%s' placeholder='Name on the Dial (optional)'>",
+            i + 1, i, entity, i, name);
+        if (written < 0 || (size_t)written >= sizeof(render->rows) - pos) break;
+        pos += (size_t)written;
+    }
+    if (notice && *notice) {
+        char escaped[512];
+        html_escape(notice, escaped, sizeof(escaped));
+        snprintf(render->notice, sizeof(render->notice), "<div class='%s'>%s</div>",
+                 error ? "status status-warn" : "success", escaped);
+    }
+    snprintf(render->summary, sizeof(render->summary),
+             render->config.count ? "%d light(s) configured" : "Not configured",
+             render->config.count);
+    snprintf(html, html_size,
+        "<!DOCTYPE html><html><head>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>" PLATFORM_PORTAL_PRODUCT_SLUG " Home Assistant</title>"
+        "<style>%s</style></head><body>%s"
+        "<h1>Home Assistant lights</h1>"
+        "<p><a href='/'>Back to settings</a></p>%s"
+        "<div class='current'><strong>Status:</strong> %s</div>"
+        "<form method='POST' action='/ha'>"
+        "<label>Home Assistant address</label>"
+        "<input type='text' name='url' maxlength='127' value='%s' placeholder='homeassistant.local or http://192.168.1.10:8123' "
+        "autocapitalize='none' autocorrect='off' spellcheck='false'>"
+        "<label>Long-lived access token</label>"
+        "<input type='password' name='token' maxlength='319' autocomplete='off' placeholder='%s'>"
+        "<p class='hint'>In Home Assistant open your profile, then Security, and create a long-lived access token. "
+        "It is stored on this device and sent only to the address above.</p>"
+        "<h2>Lights</h2>%s"
+        "<p class='hint'>Use entity IDs from Settings &rarr; Devices &amp; services &rarr; Entities. "
+        "A Home Assistant light group dims several lamps together.</p>"
+        "<input type='submit' value='Save'>"
+        "<input type='submit' name='action' value='Clear' class='btn-clear' formnovalidate>"
+        "</form>%s</body></html>",
+        PORTAL_BRAND_CSS, portal_brand_header_html(), render->notice, render->summary,
+        render->url, has_token ? "Saved. Leave blank to keep it." : "Paste the token here",
+        render->rows, portal_brand_footer_html());
+    if (status) httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, html, strlen(html));
+    free(html);
+    free(render);
+}
+
+static esp_err_t ha_get_handler(httpd_req_t *req) {
+    send_ha_page(req, NULL, NULL, false);
+    return ESP_OK;
+}
+
+/* Copies and decodes one urlencoded field. An absent field is empty; false
+ * means the value was too long, so it is rejected rather than truncated. */
+static bool ha_form_field(const char *body, const char *key, char *out, size_t size) {
+    char encoded[HA_LIGHTS_TOKEN_MAX * 3];
+    out[0] = 0;
+    esp_err_t err = httpd_query_key_value(body, key, encoded, sizeof(encoded));
+    if (err == ESP_ERR_NOT_FOUND) return true;
+    if (err != ESP_OK) return false;
+    url_decode(encoded);
+    if (strlen(encoded) >= size) return false;
+    memcpy(out, encoded, strlen(encoded) + 1);
+    return true;
+}
+
+static esp_err_t ha_post_handler(httpd_req_t *req) {
+    if (req->content_len == 0 || req->content_len > HA_FORM_MAX_BYTES) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Form too large");
+        return ESP_FAIL;
+    }
+    char *body = heap_caps_calloc(1, req->content_len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ha_lights_config_t *candidate = heap_caps_calloc(1, sizeof(*candidate), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!body || !candidate) {
+        free(body);
+        free(candidate);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+    size_t received = 0;
+    while (received < req->content_len) {
+        int n = httpd_req_recv(req, body + received, req->content_len - received);
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (n <= 0) {
+            free(body);
+            free(candidate);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+            return ESP_FAIL;
+        }
+        received += (size_t)n;
+    }
+    char action[16] = "";
+    ha_form_field(body, "action", action, sizeof(action));
+    bool clear = !strcmp(action, "Clear");
+    bool fields_ok = true;
+    if (!clear) {
+        fields_ok = ha_form_field(body, "url", candidate->base_url, sizeof(candidate->base_url)) &&
+                    ha_form_field(body, "token", candidate->token, sizeof(candidate->token));
+        for (int i = 0; fields_ok && i < HA_LIGHTS_MAX; i++) {
+            char key[4];
+            snprintf(key, sizeof(key), "e%d", i);
+            fields_ok = ha_form_field(body, key, candidate->lights[i].entity_id,
+                                      sizeof(candidate->lights[i].entity_id));
+            snprintf(key, sizeof(key), "n%d", i);
+            /* Display names are cosmetic: an over-long one falls back to the default. */
+            if (fields_ok && !ha_form_field(body, key, candidate->lights[i].name,
+                                            sizeof(candidate->lights[i].name)))
+                candidate->lights[i].name[0] = 0;
+        }
+        candidate->count = HA_LIGHTS_MAX;
+    }
+    memset(body, 0, req->content_len);
+    free(body);
+    char error[160] = "";
+    ha_dial_save_result_t result = fields_ok
+        ? home_assistant_dial_save(candidate, error, sizeof(error))
+        : HA_DIAL_SAVE_INVALID;
+    if (!fields_ok) snprintf(error, sizeof(error), "A value was too long.");
+    memset(candidate, 0, sizeof(*candidate));
+    free(candidate);
+    if (result == HA_DIAL_SAVE_OK) {
+        send_ha_page(req, NULL, "Saved. Open Menu, then Lights on the Dial.", false);
+    } else if (result == HA_DIAL_SAVE_CLEARED) {
+        send_ha_page(req, NULL, "Home Assistant lights removed.", false);
+    } else {
+        send_ha_page(req, result == HA_DIAL_SAVE_INVALID ? "400 Bad Request" : "500 Internal Server Error",
+                     error, true);
+    }
     return ESP_OK;
 }
 
@@ -790,7 +953,7 @@ void config_server_start(void) {
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
-    config.max_uri_handlers = 12;
+    config.max_uri_handlers = 14;
     config.stack_size = 8192;  // Increased for mDNS resolution during config save
     // Note: max_req_hdr_len set via CONFIG_HTTPD_MAX_REQ_HDR_LEN in sdkconfig
 
@@ -866,6 +1029,20 @@ void config_server_start(void) {
         .handler = ble_forget_handler,
     };
     httpd_register_uri_handler(s_server, &ble_forget);
+
+    httpd_uri_t ha_get = {
+        .uri = "/ha",
+        .method = HTTP_GET,
+        .handler = ha_get_handler,
+    };
+    httpd_register_uri_handler(s_server, &ha_get);
+
+    httpd_uri_t ha_post = {
+        .uri = "/ha",
+        .method = HTTP_POST,
+        .handler = ha_post_handler,
+    };
+    httpd_register_uri_handler(s_server, &ha_post);
 
     if (!power_debug_web_register(s_server)) {
         ESP_LOGE(TAG, "Shared power-debug routes unavailable");
