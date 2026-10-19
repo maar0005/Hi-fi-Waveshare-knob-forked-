@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.0] - 2026-10-19
+
+
+
 ## 2.8.0-alpha.2
 
 - Stop ordinary Wi-Fi retries from disconnecting a new association before DHCP; cancel stale retries when an IP arrives.
