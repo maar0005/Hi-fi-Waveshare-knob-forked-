@@ -8,7 +8,7 @@ See [AGENTS.md](AGENTS.md) for complete instructions on working with this projec
 
 | Area | Path | Description |
 |------|------|-------------|
-| **Usage** | `docs/usage/` | End-user guides: Dial setup, WiFi provisioning, OTA updates |
+| **Usage** | `docs/usage/` | End-user guides: Dial setup, WiFi provisioning, OTA updates, Home Assistant lights |
 | **Targets** | `docs/targets/` | Per-controller index: what is documented for each target |
 | **Dial** | `docs/dial/` | Dial and shared ESP32 hardware: display, touch, encoder, battery |
 | **Dev** | `docs/dev/` | Developer reference: build, boot sequence, FreeRTOS, NVS storage |
@@ -19,7 +19,7 @@ See [AGENTS.md](AGENTS.md) for complete instructions on working with this projec
 
 | Controller | Target dir | Docs |
 |---|---|---|
-| HiPhi Dial | `idf_app` | `docs/usage/DIAL.md`, `docs/dial/` |
+| HiPhi Dial | `idf_app` | `docs/usage/DIAL.md`, `docs/usage/HOME_ASSISTANT_LIGHTS.md`, `docs/dial/` |
 | Dial auxiliary parking image | `knob_aux_app` | `docs/dial/DUAL_CHIP_ARCHITECTURE.md` |
 | HiPhi Frame | `frame_app` | `docs/dial/BLE_HID.md`, `.oh/frame-recovery.md` |
 | HiPhi Slate | `rlcd_app` | `docs/targets/README.md` |

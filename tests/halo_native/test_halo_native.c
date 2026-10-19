@@ -126,6 +126,38 @@ bool platform_touch_has_device_controls(void) {
 void platform_touch_show_device_controls(void) { device_controls_visible=true; }
 bool platform_touch_device_controls_visible(void) { return device_controls_visible; }
 void platform_touch_scroll_device_controls(int delta) { device_scroll_delta+=delta; }
+/* Light fixture mirrors the Dial runtime's optimistic view; HALO has none. */
+#ifdef TEST_DIAL_TOUCH
+static int fixture_lights = 2;
+#else
+static int fixture_lights = 0;
+#endif
+static platform_light_view_t fixture_light[2] = {
+    {.name = "Sofa lamp", .known = true, .available = true, .on = true, .dimmable = true, .brightness_pct = 50},
+    {.name = "Hall", .known = true, .available = true, .on = false, .dimmable = true, .brightness_pct = 80}};
+static uint32_t fixture_light_revision = 1;
+static int light_refreshes, light_toggles, light_sets, last_light_set = -1, last_light_index = -1;
+int platform_lights_count(void) { return fixture_lights; }
+bool platform_lights_view(int index, platform_light_view_t *out) {
+  if (index < 0 || index >= fixture_lights) return false;
+  *out = fixture_light[index];
+  return true;
+}
+uint32_t platform_lights_revision(void) { return fixture_light_revision; }
+void platform_lights_refresh(int index) { assert(index >= 0 && index < fixture_lights); light_refreshes++; }
+void platform_lights_set_brightness(int index, int percent) {
+  assert(index >= 0 && index < fixture_lights && percent >= 0 && percent <= 100);
+  light_sets++; last_light_set = percent; last_light_index = index;
+  fixture_light[index].on = percent != 0;
+  if (percent) fixture_light[index].brightness_pct = percent;
+  fixture_light_revision++;
+}
+void platform_lights_toggle(int index) {
+  assert(index >= 0 && index < fixture_lights);
+  light_toggles++;
+  fixture_light[index].on = !fixture_light[index].on;
+  fixture_light_revision++;
+}
 static int saved_brightness = 100, brightness_saves;
 void platform_touch_set_brightness(int percent) { (void)percent; }
 int platform_touch_load_brightness(void) { return saved_brightness; }
@@ -598,6 +630,95 @@ int main(int argc, char **argv) {
   assert(device_scroll_delta==2);
   change_screen(CONTROLLER_SCREEN_ARTWORK);
   assert(!device_controls_visible);
+
+  /* Lights: Menu gains a row only when lights are configured. */
+  menu_index = 0;
+  change_screen(CONTROLLER_SCREEN_MENU);
+  assert(rows[2] && rows[3]);
+  assert(controller_touch_navigation_encoder(9) && menu_index == 3);
+  click(rows[2]);
+  assert(screen == CONTROLLER_SCREEN_LIGHTS && light_index < 0);
+  assert(light_refreshes == 2 && rows[0] && rows[1] && !rows[2]);
+  assert(!strcmp(lv_label_get_text(lv_obj_get_child(rows[0], 1)), "On · 50%"));
+  assert(!strcmp(lv_label_get_text(lv_obj_get_child(rows[1], 1)), "Off"));
+  snapshot(dir, "lights");
+  assert(controller_touch_navigation_encoder(5) && light_focus == 1);
+  assert(controller_touch_navigation_encoder(-5) && light_focus == 0);
+  /* External change is redrawn in place on the list. */
+  fixture_light[1].on = true; fixture_light[1].brightness_pct = 30; fixture_light_revision++;
+  controller_touch_navigation_process();
+  assert(!strcmp(lv_label_get_text(lv_obj_get_child(rows[1], 1)), "On · 30%"));
+  fixture_light[1].on = false; fixture_light_revision++;
+  click(rows[0]);
+  assert(light_index == 0 && light_arc && light_refreshes == 3);
+  assert(lv_arc_get_value(light_arc) == 50);
+  assert(!strcmp(lv_label_get_text(light_value), "50%"));
+  snapshot(dir, "light");
+  /* Knob: 5% per detent from the current level, applied immediately. */
+  assert(controller_touch_navigation_encoder(3));
+  assert(last_light_set == 65 && last_light_index == 0);
+  lv_obj_t *arc_before = light_arc;
+  controller_touch_navigation_process();
+  assert(light_arc == arc_before); /* updated in place, not rebuilt */
+  assert(lv_arc_get_value(light_arc) == 65);
+  assert(!strcmp(lv_label_get_text(light_value), "65%"));
+  assert(controller_touch_navigation_encoder(-40) && last_light_set == 0);
+  controller_touch_navigation_process();
+  assert(!strcmp(lv_label_get_text(light_value), "Off"));
+  assert(!strcmp(lv_label_get_text(lv_obj_get_child(light_toggle, 0)), "Turn on"));
+  int sets = light_sets;
+  assert(controller_touch_navigation_encoder(-1) && light_sets == sets); /* already off */
+  assert(controller_touch_navigation_encoder(1) && last_light_set == 5); /* off starts at 0 */
+  click(light_toggle);
+  assert(light_toggles == 1 && !fixture_light[0].on);
+  /* Dragging the arc sends its value. */
+  lv_arc_set_value(light_arc, 30);
+  lv_obj_send_event(light_arc, LV_EVENT_VALUE_CHANGED, NULL);
+  assert(last_light_set == 30 && fixture_light[0].on);
+  /* Errors surface without leaving the dimmer. */
+  snprintf(fixture_light[0].notice, sizeof(fixture_light[0].notice), "Token rejected. Check web settings.");
+  fixture_light_revision++;
+  controller_touch_navigation_process();
+  assert(!strcmp(lv_label_get_text(light_status), "Token rejected. Check web settings."));
+  fixture_light[0].notice[0] = 0;
+  /* Unavailable lights ignore the knob. */
+  fixture_light[0].available = false; fixture_light_revision++;
+  sets = light_sets;
+  assert(controller_touch_navigation_encoder(2) && light_sets == sets);
+  controller_touch_navigation_process();
+  assert(!lv_obj_has_flag(light_arc, LV_OBJ_FLAG_CLICKABLE));
+  fixture_light[0].available = true;
+  /* Volume never leaks into the Lights screen. */
+  assert(!controller_navigation_encoder_uses_volume(CONTROLLER_SCREEN_LIGHTS));
+  /* Periodic resync while visible. */
+  int refreshes = light_refreshes;
+  advance(10100);
+  controller_touch_navigation_process();
+  assert(light_refreshes == refreshes + 1);
+  click(back);
+  assert(screen == CONTROLLER_SCREEN_LIGHTS && light_index < 0 && light_focus == 0);
+  click(back);
+  assert(screen == CONTROLLER_SCREEN_MENU);
+  /* With one light, Lights opens its dimmer directly and Back returns to Menu. */
+  fixture_lights = 1;
+  change_screen(CONTROLLER_SCREEN_MENU);
+  click(rows[2]);
+  assert(screen == CONTROLLER_SCREEN_LIGHTS && light_index == 0 && light_arc);
+  click(back);
+  assert(screen == CONTROLLER_SCREEN_MENU && menu_index == 2);
+  /* Settings stays reachable from its shifted row. */
+  lv_obj_scroll_to_view(rows[3], LV_ANIM_OFF); advance(100); click(rows[3]);
+  assert(screen == CONTROLLER_SCREEN_SETTINGS);
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
+#else
+  /* HALO: no lights, so Menu keeps Library, Zone, Settings. */
+  menu_index = 0;
+  change_screen(CONTROLLER_SCREEN_MENU);
+  assert(rows[2] && !rows[3]);
+  assert(controller_touch_navigation_encoder(9) && menu_index == 2);
+  click(rows[2]);
+  assert(screen == CONTROLLER_SCREEN_SETTINGS);
+  change_screen(CONTROLLER_SCREEN_ARTWORK);
 #endif
   lv_mem_monitor_t memory;
   lv_mem_monitor(&memory);

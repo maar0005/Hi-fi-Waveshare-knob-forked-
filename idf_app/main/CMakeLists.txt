@@ -24,6 +24,8 @@ set(SRC_FILES
     "controller_input_profile_dial.c"
     "controller_presentation_dial.c"
     "ble_hid_host_dial.c"
+    "home_assistant_dial.c"
+    "../../common/home_assistant_lights.c"
     "font_manager.c"
     # Generated bitmap fonts (run scripts/generate_fonts.sh to regenerate)
     # Typography: Lato for metadata, Noto Sans for content (matches Roon's design)
@@ -92,6 +94,7 @@ idf_component_register(
         esp_adc
         app_update
         json
+        mbedtls
         rk_ble_hid_host
 )
 

@@ -36,6 +36,8 @@ The preview shares its round-screen navigation with HALO. Artwork has no buttons
 
 Turn the knob for volume on Artwork/Now playing. In Library, Zones and Settings it browses or scrolls visible content. Lists scroll vertically with touch; album covers form a horizontal carousel. Back preserves collection selection, and Play/Queue are deliberate actions. Search folders are excluded. Settings includes connection details, Wi-Fi/bridge editing, saved networks, About, saved brightness and confirmed reset. Device controls retains update checks and BLE status. Battery, rotation, dim/sleep and wake suppression remain target-owned; artwork is an awake surface, and the contact that wakes a sleeping panel is consumed until release.
 
+Roon playlists are under **Menu → Library → Playlists**. When Home Assistant lights are configured, Menu also shows **Lights**, where the knob dims the chosen light; see [Home Assistant lights](HOME_ASSISTANT_LIGHTS.md).
+
 The stable controls below describe firmware before this preview.
 
 ## Stable controls
