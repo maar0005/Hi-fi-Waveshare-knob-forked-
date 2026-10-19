@@ -32,7 +32,6 @@ Developer reference for building and extending the firmware.
 
 - [DEVELOPMENT.md](dev/DEVELOPMENT.md) - Build setup, PC simulator, bridge development
 - [IMPLEMENTATION_NOTES.md](dev/IMPLEMENTATION_NOTES.md) - Architecture overview, input/display systems
-- [KIZZ_VOICE.md](dev/KIZZ_VOICE.md) - Kizz wake word, transcription, action path, and observed STT evidence
 - [KCONFIG.md](dev/KCONFIG.md) - ESP-IDF configuration options
 - [NVS_STORAGE.md](dev/NVS_STORAGE.md) - Non-volatile storage (config persistence)
 - [BOOT_SEQUENCE.md](dev/BOOT_SEQUENCE.md) - System initialization flow
@@ -101,9 +100,7 @@ Competitor and alternative project analysis.
 Tutorials for porting and reusing patterns.
 
 - [PORTING.md](howto/PORTING.md) - Porting to other ESP32 boards or building different apps
-- [AtomS3 Joystick hardware](dial/hw-reference/board-atom-s3-joystick.md)
 
-## M5 hardware and Wi-Fi setup
+## Wi-Fi setup
 
-- [M5Stack Tough build, flash, and controls](dial/M5STACK.md)
 - [Wi-Fi scan behavior and troubleshooting](dial/WIFI_SCAN.md)

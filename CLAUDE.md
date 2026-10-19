@@ -21,12 +21,10 @@ See [AGENTS.md](AGENTS.md) for complete instructions on working with this projec
 |---|---|---|
 | HiPhi Dial | `idf_app` | `docs/usage/DIAL.md`, `docs/usage/HOME_ASSISTANT_LIGHTS.md`, `docs/dial/` |
 | Dial auxiliary parking image | `knob_aux_app` | `docs/dial/DUAL_CHIP_ARCHITECTURE.md` |
-| HiPhi Frame | `frame_app` | `docs/dial/BLE_HID.md`, `.oh/frame-recovery.md` |
-| HiPhi Slate | `rlcd_app` | `docs/targets/README.md` |
-| HiPhi Joy | `atom_app` | `docs/dial/hw-reference/board-atom-s3-joystick.md` |
-| HiPhi HALO | `halo_app` | `docs/targets/README.md` |
-| HiPhi Tough | `tough_app` | `docs/dial/M5STACK.md`, `docs/dial/hw-reference/board-tough.md` |
-| Dial Lab / Twist / Remote / Kizz | `m5_beta_app` | `docs/dial/hw-reference/m5-form-native-betas.md`, `docs/dev/KIZZ_VOICE.md` |
+
+This fork builds only the Waveshare knob. The other HiPhi controllers (Frame,
+Slate, Joy, HALO, Tough, Dial Lab, Twist, Remote, Kizz) were removed and remain
+in the upstream repository.
 
 **When working on:**
 - **UI changes** → `docs/dial/DISPLAY.md`, `docs/dial/TOUCH_INPUT.md`, `docs/dial/FONTS.md`
@@ -34,7 +32,7 @@ See [AGENTS.md](AGENTS.md) for complete instructions on working with this projec
 - **WiFi/networking** → `docs/usage/WIFI_PROVISIONING.md`, `docs/dev/NVS_STORAGE.md`
 - **Build/config** → `docs/dev/KCONFIG.md`, `docs/dev/DEVELOPMENT.md`
 - **Architecture decisions** → `docs/meta/decisions/`
-- **A target that is not the Dial** → `docs/targets/README.md` first
+- **Home Assistant lights** → `docs/usage/HOME_ASSISTANT_LIGHTS.md`
 
 **Keeping docs current:** When you learn something new about the hardware (pin mappings, component behavior, timing), update the relevant file in `docs/dial/hw-reference/`.
 
@@ -139,17 +137,10 @@ The GitHub Actions workflow (`docker.yml`) automatically:
 - Extracts version from the tag name
 - Injects it into every target's `CMakeLists.txt`
 - Builds firmware and creates GitHub release with binaries
-- Deploys web flasher to GitHub Pages
 
 **Version locations (DO NOT EDIT MANUALLY).** CI injects `PROJECT_VER` into each
 of these in `docker.yml`:
 - `idf_app/CMakeLists.txt` (HiPhi Dial)
-- `frame_app/CMakeLists.txt` (HiPhi Frame)
-- `rlcd_app/CMakeLists.txt` (HiPhi Slate)
-- `atom_app/CMakeLists.txt` (HiPhi Joy)
-- `halo_app/CMakeLists.txt` (HiPhi HALO)
-- `tough_app/CMakeLists.txt` (HiPhi Tough)
-- `m5_beta_app/CMakeLists.txt` (Dial Lab, Twist, Remote, Kizz)
 - `knob_aux_app/CMakeLists.txt` (Dial auxiliary parking image)
 
 **Bridge:** [unified-hifi-control](https://github.com/open-horizon-labs/unified-hifi-control)
@@ -175,10 +166,8 @@ a local convenience.
 
 ### Fresh Checkout / Worktree Setup
 ```bash
-git submodule update --init --recursive   # M5 vendor components under components/m5_official/vendor
 source ~/esp/esp-idf/export.sh
 ```
-Without the submodules, `atom_app` and `m5_beta_app` fail at configure time.
 
 ### Target Chip
 Targets differ per app. Each `sdkconfig.defaults` pins its chip so a fresh
@@ -186,12 +175,12 @@ checkout configures correctly:
 
 | App | Chip |
 |-----|------|
-| `idf_app`, `frame_app`, `rlcd_app`, `atom_app`, `halo_app`, `m5_beta_app` | `esp32s3` |
-| `tough_app`, `knob_aux_app` | `esp32` |
+| `idf_app` | `esp32s3` |
+| `knob_aux_app` | `esp32` |
 
 If a build fails with undeclared `ESP_EXT1_WAKEUP_*` or similar, a stale
 `sdkconfig` was generated for the wrong chip:
 ```bash
 rm sdkconfig
-idf.py set-target esp32s3   # or esp32 for tough_app / knob_aux_app
+idf.py set-target esp32s3   # or esp32 for knob_aux_app
 ```

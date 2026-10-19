@@ -11,12 +11,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 CMAKE_FILES=(
     "$ROOT_DIR/idf_app/CMakeLists.txt"
-    "$ROOT_DIR/frame_app/CMakeLists.txt"
-    "$ROOT_DIR/rlcd_app/CMakeLists.txt"
-    "$ROOT_DIR/atom_app/CMakeLists.txt"
-    "$ROOT_DIR/halo_app/CMakeLists.txt"
-    "$ROOT_DIR/tough_app/CMakeLists.txt"
-    "$ROOT_DIR/m5_beta_app/CMakeLists.txt"
     "$ROOT_DIR/knob_aux_app/CMakeLists.txt"
 )
 

@@ -33,7 +33,6 @@ RAW_STORAGE_ALLOWED = {
     "common/controller_config.c",
     "common/platform/platform_storage.h",
     "idf_app/main/platform_storage_idf.c",
-    "frame_app/main/platform_storage_frame.c",
 }
 SRC_FILES_RE = re.compile(
     r"set\s*\(\s*SRC_FILES(?P<body>.*?)\)", re.DOTALL
@@ -496,8 +495,7 @@ def raw_storage_api_errors(
 ) -> list[str]:
     """Reject raw configuration persistence references outside its owner/ports."""
     candidates: set[Path] = set(extra_sources)
-    for source_root in (root / "common", root / "idf_app" / "main",
-                        root / "frame_app" / "main"):
+    for source_root in (root / "common", root / "idf_app" / "main"):
         for suffix in ("*.c", "*.h"):
             candidates.update(source_root.rglob(suffix))
 
@@ -584,10 +582,10 @@ def run_negative_fixture(policy: dict) -> None:
     broad_policy = copy.deepcopy(policy)
     broad_policy["legacy_composition_edges"].append(
         {
-            "target": "atom",
+            "target": "dial",
             "kind": "source",
             "source": "*",
-            "value": "tough_app/main/*",
+            "value": "other_app/main/*",
             "owner": "test",
             "retirement_issue": "#0",
             "reason": "must be rejected as a wildcard",
@@ -598,9 +596,9 @@ def run_negative_fixture(policy: dict) -> None:
     except ValueError:
         pass
     else:
-        raise AssertionError("broad Atom/Tough composition allowlist was accepted")
+        raise AssertionError("broad composition allowlist was accepted")
 
-    new_edge = CompositionEdge("atom", "source", "-", "tough_app/main/new_target.c")
+    new_edge = CompositionEdge("dial", "source", "-", "other_app/main/new_target.c")
     if not any("unlisted target composition edge" in error for error in validate_composition(policy, composition | {new_edge})):
         raise AssertionError("a new target-specific edge did not fail beside legacy debt")
     print("controller dependency negative fixture passed")

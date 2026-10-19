@@ -12,117 +12,12 @@
         "components/rk_ble_hid_host/include",
         "components/rk_ble_hid_host"
       ]
-    },
-    "frame": {
-      "cmake": "frame_app/main/CMakeLists.txt",
-      "include_dirs": [
-        "frame_app/main",
-        "include",
-        "common",
-        "components/rk_ble_hid_host/include",
-        "components/rk_ble_hid_host"
-      ]
-    },
-    "atom": {
-      "cmake": "atom_app/main/CMakeLists.txt",
-      "edge_mode": "composition",
-      "include_dirs": [
-        "atom_app/main",
-        "include",
-        "common",
-        "tough_app/main"
-      ]
-    },
-    "tough": {
-      "cmake": "tough_app/main/CMakeLists.txt",
-      "edge_mode": "composition",
-      "include_dirs": [
-        "tough_app/main",
-        "include",
-        "common"
-      ]
     }
   },
   "target_roots": {
-    "dial": "idf_app/main",
-    "frame": "frame_app/main",
-    "atom": "atom_app/main",
-    "tough": "tough_app/main"
+    "dial": "idf_app/main"
   },
-  "legacy_composition_edges": [
-    {
-      "target": "atom",
-      "kind": "include",
-      "source": "atom_app/main/main_atom.c",
-      "value": "tough_app/main/main_tough.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom currently reuses the Tough composition root; split the target roots before removing this exact edge."
-    },
-    {
-      "target": "atom",
-      "kind": "include_dir",
-      "source": "-",
-      "value": "tough_app/main",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom currently resolves shared services through the Tough source directory."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/captive_portal.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough captive portal implementation."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/dns_server.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough DNS implementation."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/platform_http_tough.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough HTTP adapter."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/platform_log_tough.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough logging adapter."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/platform_provisioning_tough.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough provisioning adapter."
-    },
-    {
-      "target": "atom",
-      "kind": "source",
-      "source": "-",
-      "value": "tough_app/main/platform_storage_tough.c",
-      "owner": "Atom firmware migration",
-      "retirement_issue": "#191",
-      "reason": "Atom CMake currently compiles the Tough storage adapter."
-    }
-  ],
+  "legacy_composition_edges": [],
   "negative_fixture": {
     "target": "dial",
     "source": "tests/fixtures/controller_dependency/common/new_controller.c",
@@ -344,192 +239,6 @@
     "dial|idf_app/main/ui_network.c|idf_app/main/ota_update.h",
     "dial|idf_app/main/ui_network.c|idf_app/main/ui_network.h",
     "dial|idf_app/main/ui_network.h|common/wifi_manager.h",
-    "frame|common/app_main.c|common/app.h",
-    "frame|common/app_main.c|common/bridge_client.h",
-    "frame|common/app_main.c|common/controller_action_router.h",
-    "frame|common/app_main.c|common/controller_config.h",
-    "frame|common/app_main.c|common/controller_input.h",
-    "frame|common/app_main.c|common/platform/platform_log.h",
-    "frame|common/app_main.c|common/platform/platform_mdns.h",
-    "frame|common/app_main.c|common/platform/platform_power.h",
-    "frame|common/bridge_client.c|common/wifi_manager.h",
-    "frame|common/bridge_client.c|common/bridge_client.h",
-    "frame|common/bridge_client.c|common/bridge_command_plan.h",
-    "frame|common/bridge_client.c|common/controller_config.h",
-    "frame|common/bridge_client.c|common/controller_presentation.h",
-    "frame|common/bridge_client.c|common/controller_view.h",
-    "frame|common/bridge_client.c|common/controller_view_compat.h",
-    "frame|common/bridge_client.c|common/platform/platform_display.h",
-    "frame|common/bridge_client.c|common/platform/platform_http.h",
-    "frame|common/bridge_client.c|common/platform/platform_log.h",
-    "frame|common/bridge_client.c|common/platform/platform_mdns.h",
-    "frame|common/bridge_client.c|common/platform/platform_mdns_endpoint.h",
-    "frame|common/bridge_client.c|common/platform/platform_power.h",
-    "frame|common/bridge_client.c|common/platform/platform_task.h",
-    "frame|common/bridge_client.c|common/platform/platform_time.h",
-    "frame|common/bridge_client.c|include/os_mutex.h",
-    "frame|common/bridge_client.h|common/controller_command.h",
-    "frame|common/bridge_client.h|common/controller_connection.h",
-    "frame|common/controller_connection.c|common/controller_connection.h",
-    "frame|common/platform/platform_mdns.h|common/platform/platform_mdns_endpoint.h",
-    "frame|common/bridge_client.h|common/platform/platform_http.h",
-    "frame|common/bridge_command_plan.c|common/bridge_command_plan.h",
-    "frame|common/bridge_command_plan.h|common/controller_command.h",
-    "frame|common/controller_action.h|common/controller_command.h",
-    "frame|common/controller_action_router.c|common/bridge_client.h",
-    "frame|common/controller_action_router.c|common/controller_action_router.h",
-    "frame|common/controller_action_router.c|common/controller_input.h",
-    "frame|common/controller_action_router.c|common/controller_presentation.h",
-    "frame|common/controller_action_router.c|common/platform/platform_task.h",
-    "frame|common/controller_action_router.h|common/controller_action.h",
-    "frame|common/controller_ble_input.c|common/controller_ble_input.h",
-    "frame|common/controller_ble_input.c|common/controller_input.h",
-    "frame|common/controller_ble_input.h|components/rk_ble_hid_host/include/rk_ble_hid_host.h",
-    "frame|common/controller_config.c|common/controller_config.h",
-    "frame|common/controller_config.c|common/platform/platform_storage.h",
-    "frame|common/controller_config.c|include/os_mutex.h",
-    "frame|common/controller_config.h|common/rk_cfg.h",
-    "frame|common/controller_input.c|common/controller_input.h",
-    "frame|common/controller_input.c|common/controller_input_profile.h",
-    "frame|common/controller_input.c|common/platform/platform_task.h",
-    "frame|common/controller_input.h|common/controller_action.h",
-    "frame|common/controller_input_mailbox.c|common/controller_input_mailbox.h",
-    "frame|common/controller_input_mailbox.h|common/controller_input.h",
-    "frame|common/controller_input_profile.h|common/controller_input.h",
-    "frame|common/controller_view.c|common/controller_view.h",
-    "frame|common/controller_view_compat.c|common/controller_presentation.h",
-    "frame|common/controller_view_compat.c|common/controller_view_compat.h",
-    "frame|common/controller_view_compat.h|common/controller_view.h",
-    "frame|common/platform/platform_display.h|common/rk_cfg.h",
-    "frame|common/platform/platform_mdns_endpoint.c|common/platform/platform_mdns_endpoint.h",
-    "frame|common/platform/platform_input.h|common/controller_input.h",
-    "frame|common/platform/platform_log.c|common/platform/platform_log.h",
-    "frame|common/platform/platform_power.c|common/controller_config.h",
-    "frame|common/platform/platform_power.c|common/platform/platform_display.h",
-    "frame|common/platform/platform_power.c|common/platform/platform_log.h",
-    "frame|common/platform/platform_power.c|common/platform/platform_power.h",
-    "frame|common/platform/platform_power.c|common/platform/platform_time.h",
-    "frame|common/platform/platform_storage.h|common/rk_cfg.h",
-    "frame|common/platform/platform_task.c|common/platform/platform_task.h",
-    "frame|common/platform/platform_task.c|include/os_mutex.h",
-    "frame|common/platform/platform_task.h|include/os_thread.h",
-    "frame|common/platform/platform_time.c|common/platform/platform_time.h",
-    "frame|common/platform/platform_time.c|include/os_time.h",
-    "frame|common/power_debug_web.c|common/platform/platform_identity.h",
-    "frame|common/power_debug_web.c|common/platform/platform_log.h",
-    "frame|common/power_debug_web.c|common/platform/platform_power.h",
-    "frame|common/power_debug_web.c|common/power_debug_web.h",
-    "frame|common/portal_brand.c|common/portal_brand.h",
-    "frame|common/power_debug_web.c|common/portal_brand.h",
-    "frame|common/controller_utf8.c|common/controller_utf8.h",
-    "frame|common/assets/hiphi_logo_mono.c|common/assets/hiphi_logo_mono.h",
-    "frame|frame_app/main/eink_ui.c|common/assets/hiphi_logo_mono.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_identity.h",
-    "frame|common/wifi_portal_form.c|common/wifi_portal_form.h",
-    "frame|common/wifi_portal_form.h|common/wifi_manager.h",
-    "frame|common/wifi_manager.c|common/controller_config.h",
-    "frame|common/wifi_manager.c|common/platform/platform_identity.h",
-    "frame|common/wifi_manager.c|common/platform/platform_power.h",
-    "frame|common/wifi_manager.c|common/platform/platform_provisioning.h",
-    "frame|common/wifi_manager.c|common/platform/platform_time.h",
-    "frame|common/wifi_manager.c|common/wifi_manager.h",
-    "frame|common/wifi_manager.c|include/os_mutex.h",
-    "frame|common/wifi_manager.c|common/portal_trace.h",
-    "frame|common/wifi_manager.h|common/controller_config.h",
-    "frame|frame_app/main/ble_hid_host_frame.c|common/controller_ble_input.h",
-    "frame|frame_app/main/ble_hid_host_frame.c|common/platform/platform_task.h",
-    "frame|frame_app/main/ble_hid_host_frame.c|components/rk_ble_hid_host/include/rk_ble_hid_host.h",
-    "frame|frame_app/main/ble_hid_host_frame.c|frame_app/main/ble_hid_host_frame.h",
-    "frame|frame_app/main/ble_hid_host_frame.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/captive_portal.c|common/bridge_client.h",
-    "frame|frame_app/main/captive_portal.c|common/controller_config.h",
-    "frame|frame_app/main/captive_portal.c|common/power_debug_web.h",
-    "frame|frame_app/main/captive_portal.c|common/wifi_manager.h",
-    "frame|frame_app/main/captive_portal.c|components/rk_ble_hid_host/include/rk_ble_hid_host.h",
-    "frame|frame_app/main/captive_portal.c|frame_app/main/captive_portal.h",
-    "frame|frame_app/main/captive_portal.c|frame_app/main/dns_server.h",
-    "frame|frame_app/main/captive_portal.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/captive_portal.c|common/wifi_portal_form.h",
-    "frame|frame_app/main/captive_portal.c|common/portal_brand.h",
-    "frame|frame_app/main/captive_portal.c|frame_app/main/frame_display_preferences.h",
-    "frame|frame_app/main/captive_portal.c|include/os_mutex.h",
-    "frame|frame_app/main/captive_portal.c|common/portal_trace.h",
-    "frame|frame_app/main/controller_input_profile_frame.c|common/controller_input_profile.h",
-    "frame|frame_app/main/controller_presentation_frame.c|common/controller_config.h",
-    "frame|frame_app/main/controller_presentation_frame.c|common/controller_presentation.h",
-    "frame|frame_app/main/controller_presentation_frame.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/controller_system_frame.c|common/wifi_manager.h",
-    "frame|frame_app/main/controller_system_frame.c|frame_app/main/controller_system_frame.h",
-    "frame|frame_app/main/controller_system_frame.h|common/controller_input.h",
-    "frame|frame_app/main/dns_server.c|frame_app/main/dns_server.h",
-    "frame|frame_app/main/dns_server.c|common/portal_trace.h",
-    "frame|frame_app/main/eink_display.c|frame_app/main/eink_display.h",
-    "frame|frame_app/main/eink_font.c|frame_app/main/eink_display.h",
-    "frame|frame_app/main/eink_font.c|frame_app/main/eink_font.h",
-    "frame|frame_app/main/eink_font.c|common/controller_utf8.h",
-    "frame|frame_app/main/eink_font.c|frame_app/main/eink_font_unifont.inc",
-    "frame|frame_app/main/eink_ui.c|common/bridge_client.h",
-    "frame|frame_app/main/eink_ui.c|common/controller_utf8.h",
-    "frame|frame_app/main/eink_ui.c|common/platform/platform_http.h",
-    "frame|frame_app/main/eink_ui.c|common/platform/platform_log.h",
-    "frame|frame_app/main/eink_ui.c|common/platform/platform_task.h",
-    "frame|frame_app/main/eink_ui.c|common/platform/platform_time.h",
-    "frame|frame_app/main/eink_ui.c|frame_app/main/eink_display.h",
-    "frame|frame_app/main/eink_ui.c|frame_app/main/eink_font.h",
-    "frame|frame_app/main/eink_ui.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/frame_display_preferences.c|frame_app/main/frame_display_preferences.h",
-    "frame|frame_app/main/frame_power_manager.c|common/bridge_client.h",
-    "frame|frame_app/main/frame_power_manager.c|common/controller_config.h",
-    "frame|frame_app/main/frame_power_manager.c|common/platform/platform_input.h",
-    "frame|frame_app/main/frame_power_manager.c|common/platform/platform_task.h",
-    "frame|frame_app/main/frame_power_manager.c|common/wifi_manager.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/ble_hid_host_frame.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/captive_portal.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/frame_power_manager.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/frame_power_policy.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/platform_input_frame.h",
-    "frame|frame_app/main/frame_power_manager.c|frame_app/main/pmic_axp2101.h",
-    "frame|frame_app/main/frame_power_policy.c|frame_app/main/frame_power_policy.h",
-    "frame|frame_app/main/frame_power_manager.h|common/platform/platform_power.h",
-    "frame|frame_app/main/main_frame.c|common/app.h",
-    "frame|frame_app/main/main_frame.c|common/bridge_client.h",
-    "frame|frame_app/main/main_frame.c|common/controller_config.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_http.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_input.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_mdns.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_task.h",
-    "frame|frame_app/main/main_frame.c|common/platform/platform_time.h",
-    "frame|frame_app/main/main_frame.c|common/wifi_manager.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/ble_hid_host_frame.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/captive_portal.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/eink_display.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/eink_ui.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/frame_display_preferences.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/frame_power_manager.h",
-    "frame|frame_app/main/main_frame.c|frame_app/main/pmic_axp2101.h",
-    "frame|frame_app/main/platform_display_frame.c|common/platform/platform_display.h",
-    "frame|frame_app/main/platform_display_frame.c|common/platform/platform_power.h",
-    "frame|frame_app/main/platform_display_frame.c|frame_app/main/frame_power_manager.h",
-    "frame|frame_app/main/platform_display_frame.c|frame_app/main/pmic_axp2101.h",
-    "frame|frame_app/main/platform_http_frame.c|common/platform/platform_http.h",
-    "frame|frame_app/main/platform_http_frame.c|common/platform/platform_identity.h",
-    "frame|frame_app/main/platform_identity_frame.c|common/platform/platform_identity.h",
-    "frame|frame_app/main/platform_input_frame.c|common/controller_input.h",
-    "frame|frame_app/main/platform_input_frame.c|common/controller_input_mailbox.h",
-    "frame|frame_app/main/platform_input_frame.c|common/platform/platform_input.h",
-    "frame|frame_app/main/platform_input_frame.c|frame_app/main/controller_system_frame.h",
-    "frame|frame_app/main/platform_input_frame.c|frame_app/main/platform_input_frame.h",
-    "frame|frame_app/main/platform_log_frame.c|common/platform/platform_log.h",
-    "frame|common/platform/platform_mdns_esp.c|common/platform/platform_mdns.h",
-    "frame|common/platform/platform_mdns_esp.c|common/platform/platform_identity.h",
-    "frame|common/platform/platform_mdns_esp.c|common/platform/platform_mdns_endpoint.h",
-    "frame|common/portal_trace.c|common/portal_trace.h",
-    "frame|frame_app/main/platform_provisioning_frame.c|common/platform/platform_provisioning.h",
-    "frame|frame_app/main/platform_provisioning_frame.c|frame_app/main/captive_portal.h",
-    "frame|frame_app/main/platform_storage_frame.c|common/platform/platform_storage.h",
-    "frame|frame_app/main/platform_storage_frame.c|common/rk_cfg.h",
-    "frame|frame_app/main/pmic_axp2101.c|frame_app/main/pmic_axp2101.h",
     "dial|idf_app/main/ota_update.c|common/platform/platform_identity.h",
     "dial|common/controller_library.c|common/controller_library.h",
     "dial|common/controller_navigation.c|common/controller_navigation.h",
@@ -562,11 +271,7 @@
     "dial|common/wifi_manager.c|common/bridge_client.h",
     "dial|idf_app/main/home_assistant_dial.c|common/platform/platform_lights.h",
     "dial|idf_app/main/home_assistant_dial.c|idf_app/main/home_assistant_dial.h",
-    "dial|idf_app/main/home_assistant_dial.h|common/home_assistant_lights.h",
-    "frame|common/bridge_client.c|common/platform/platform_bridge_cache.h",
-    "frame|common/platform/platform_bridge_cache_esp.c|common/platform/platform_bridge_cache.h",
-    "frame|common/platform/platform_bridge_cache_esp.c|common/platform/platform_mdns_endpoint.h",
-    "frame|common/wifi_manager.c|common/bridge_client.h"
+    "dial|idf_app/main/home_assistant_dial.h|common/home_assistant_lights.h"
   ],
   "grandfathered_edges": [
     {
@@ -666,30 +371,6 @@
       "reason": "A target UI header exposes a connectivity implementation type."
     },
     {
-      "edge": "frame|frame_app/main/ble_hid_host_frame.c|frame_app/main/eink_ui.h",
-      "owner": "controller architecture program",
-      "retirement_issue": "#191",
-      "reason": "BLE target adapter directly refreshes the Frame renderer."
-    },
-    {
-      "edge": "frame|frame_app/main/captive_portal.c|common/bridge_client.h",
-      "owner": "controller architecture program",
-      "retirement_issue": "#190",
-      "reason": "Frame provisioning adapter queries the mixed controller client directly."
-    },
-    {
-      "edge": "frame|frame_app/main/captive_portal.c|frame_app/main/eink_ui.h",
-      "owner": "controller architecture program",
-      "retirement_issue": "#190",
-      "reason": "Frame provisioning adapter directly controls the Frame renderer."
-    },
-    {
-      "edge": "frame|frame_app/main/eink_ui.c|common/bridge_client.h",
-      "owner": "controller architecture program",
-      "retirement_issue": "#190",
-      "reason": "Frame renderer queries the mixed controller client directly."
-    },
-    {
       "edge": "dial|common/ui.c|idf_app/main/font_manager.h",
       "owner": "controller architecture program",
       "retirement_issue": "#132",
@@ -703,8 +384,7 @@
         "common/**"
       ],
       "header_patterns": [
-        "idf_app/**",
-        "frame_app/**"
+        "idf_app/**"
       ]
     },
     {
@@ -712,8 +392,7 @@
       "source_patterns": [
         "common/ui.c",
         "idf_app/main/ui_network.c",
-        "idf_app/main/ui_network.h",
-        "frame_app/main/eink_ui.c"
+        "idf_app/main/ui_network.h"
       ],
       "header_patterns": [
         "common/bridge_client.h",
@@ -735,14 +414,11 @@
       "source_patterns": [
         "idf_app/main/ble_hid_host_dial.c",
         "idf_app/main/captive_portal.c",
-        "idf_app/main/display_sleep.c",
-        "frame_app/main/ble_hid_host_frame.c",
-        "frame_app/main/captive_portal.c"
+        "idf_app/main/display_sleep.c"
       ],
       "header_patterns": [
         "common/ui.h",
-        "idf_app/main/ui_network.h",
-        "frame_app/main/eink_ui.h"
+        "idf_app/main/ui_network.h"
       ]
     },
     {
@@ -760,22 +436,12 @@
       "name": "hardware_adapter_must_not_own_controller_or_peer_policy",
       "source_patterns": [
         "idf_app/main/platform_display_idf.c",
-        "idf_app/main/platform_input_idf.c",
-        "frame_app/main/platform_input_frame.c"
+        "idf_app/main/platform_input_idf.c"
       ],
       "header_patterns": [
         "common/bridge_client.h",
         "common/wifi_manager.h",
         "idf_app/main/display_sleep.h"
-      ]
-    },
-    {
-      "name": "provisioning_adapter_must_not_query_controller",
-      "source_patterns": [
-        "frame_app/main/captive_portal.c"
-      ],
-      "header_patterns": [
-        "common/bridge_client.h"
       ]
     },
     {
@@ -792,23 +458,7 @@
         "common/bridge_client.h",
         "common/controller_presentation.h",
         "common/wifi_manager.h",
-        "idf_app/**",
-        "frame_app/**"
-      ]
-    },
-    {
-      "name": "privileged_frame_ingress_must_remain_target_input_only",
-      "source_patterns": [
-        "common/**",
-        "idf_app/**",
-        "frame_app/main/ble_hid_host_frame.c",
-        "frame_app/main/captive_portal.c",
-        "frame_app/main/controller_presentation_frame.c",
-        "frame_app/main/eink_ui.c",
-        "frame_app/main/main_frame.c"
-      ],
-      "header_patterns": [
-        "frame_app/main/controller_system_frame.h"
+        "idf_app/**"
       ]
     },
     {
@@ -824,8 +474,7 @@
       "name": "raw_config_storage_is_owner_private",
       "source_patterns": [
         "common/**",
-        "idf_app/**",
-        "frame_app/**"
+        "idf_app/**"
       ],
       "header_patterns": [
         "common/platform/platform_storage.h"
@@ -839,18 +488,8 @@
       "reason": "The shared owner is the sole production transaction client of the target storage backend."
     },
     {
-      "edge": "frame|common/controller_config.c|common/platform/platform_storage.h",
-      "owner": "controller configuration boundary",
-      "reason": "The shared owner is the sole production transaction client of the target storage backend."
-    },
-    {
       "edge": "dial|idf_app/main/platform_storage_idf.c|common/platform/platform_storage.h",
       "owner": "Dial storage backend",
-      "reason": "The target backend implements the raw storage port for the shared owner."
-    },
-    {
-      "edge": "frame|frame_app/main/platform_storage_frame.c|common/platform/platform_storage.h",
-      "owner": "Frame storage backend",
       "reason": "The target backend implements the raw storage port for the shared owner."
     }
   ]

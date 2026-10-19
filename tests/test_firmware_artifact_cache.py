@@ -9,18 +9,18 @@ spec=importlib.util.spec_from_file_location('cache',Path(__file__).parents[1]/'s
 c=importlib.util.module_from_spec(spec);spec.loader.exec_module(c)
 class CacheTests(unittest.TestCase):
     def test_input_changes(self):
-        base=[('common/a.c','1'),('idf_app/dependencies.lock','1'),('tests/test_a.c','1'),('web/flash.html','1'),('tough_app/main/a.c','1')]
+        base=[('common/a.c','1'),('idf_app/dependencies.lock','1'),('tests/test_a.c','1'),('docs/a.md','1'),('knob_aux_app/main/main.c','1')]
         original=c.fingerprint(base,'dial','')
         for index in [0,1]:
             changed=base.copy();changed[index]=(base[index][0],'2');self.assertNotEqual(original,c.fingerprint(changed,'dial',''))
         for index in [2,3,4]:
             changed=base.copy();changed[index]=(base[index][0],'2');self.assertEqual(original,c.fingerprint(changed,'dial',''))
-        self.assertNotEqual(c.fingerprint(base,'m5','dial'),c.fingerprint(base,'m5','stackchan'))
+        self.assertNotEqual(c.fingerprint(base,'dial',''),c.fingerprint(base,'dial','variant'))
     def test_dependencies_fail_closed(self):
         for path in ['new-build-input','components/a.c','.github/workflows/docker.yml','scripts/audit_firmware_stack.py','tests/fixtures/rk_ble_hid_off/main.c']:
             self.assertTrue(c.relevant(path,'dial'))
-        self.assertTrue(c.relevant('tough_app/main/a.c','m5'))
-        self.assertTrue(c.relevant('frame_app/main/a.c','rlcd'))
+        self.assertTrue(c.relevant('knob_aux_app/main/main.c','aux'))
+        self.assertFalse(c.relevant('idf_app/main/a.c','aux'))
     def test_workflow_gates_and_uploads(self):
         import yaml
         workflow=yaml.safe_load((Path(__file__).parents[1]/'.github/workflows/docker.yml').read_text())

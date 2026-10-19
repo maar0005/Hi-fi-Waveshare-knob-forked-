@@ -1,7 +1,7 @@
 # Wi-Fi scan behavior and quirks
 
-Wi-Fi scans are shared controller behavior. The Tough setup screen and the
-captive portal use the same asynchronous scan state machine:
+Wi-Fi scans are shared controller behavior. The Dial's connected settings page
+and the captive portal use the same asynchronous scan state machine:
 
 `IDLE → RUNNING → READY` (or `FAILED`)
 

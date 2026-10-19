@@ -56,17 +56,8 @@ of the file; no accent hex literals belong in widget or draw code.
 Where they are declared:
 
 - `common/ui.c` (Dial, LVGL) - used through `lv_color_hex()`.
-- `atom_app/main/touch_ui.cpp` (Joy), `tough_app/main/touch_ui.cpp` (Tough),
-  `m5_beta_app/main/touch_ui.cpp` (Dial Lab, Twist, Remote, Kizz) - M5GFX draw
-  calls take a `uint32_t` as 24-bit RGB888 and convert to the panel format
-  internally, so these are the brand hex values verbatim.
-- `rlcd_app` (Slate) draws no color accent; its reflective LCD UI is
-  monochrome and is intentionally left alone.
-- Kizz keeps its own character palette (the `STACK_*` tokens) for its face and
-  animation layouts. Only the control chrome it shares with the other M5
-  targets uses the brand accents.
 
-Neutral surfaces, text greys, and per-target background colors are unchanged.
+Neutral surfaces, text greys, and background colors are unchanged.
 
 ## Boot logo
 
@@ -97,9 +88,9 @@ python3 scripts/generate_boot_logo.py --preview
 
 | File | Format | Used by |
 |---|---|---|
-| `common/assets/hiphi_logo_lvgl.c` | LVGL 9 `lv_image_dsc_t`, ARGB8888 at 64 and 48 px, plus a 64 px A8 ink mask | Dial (48 px ARGB8888), Slate (64 px A8) |
-| `common/assets/hiphi_logo_rgb565.c` | `uint16_t` RGB565 arrays + 1-bit alpha bitmaps at 64, 48, 32 px, with an inline draw helper | Tough (64), Dial Lab / Twist / Remote (48), Joy (32) |
-| `common/assets/hiphi_logo_mono.c` | 1-bit packed, MSB first, row padded to a byte | Frame's ACeP e-ink, as `EINK_BLACK` on white |
+| `common/assets/hiphi_logo_lvgl.c` | LVGL 9 `lv_image_dsc_t`, ARGB8888 at 64 and 48 px, plus a 64 px A8 ink mask | Dial (48 px ARGB8888) |
+| `common/assets/hiphi_logo_rgb565.c` | `uint16_t` RGB565 arrays + 1-bit alpha bitmaps at 64, 48, 32 px, with an inline draw helper | Not used by the Dial build (kept from the multi-device generator) |
+| `common/assets/hiphi_logo_mono.c` | 1-bit packed, MSB first, row padded to a byte | Not used by the Dial build (kept from the multi-device generator) |
 
 **Two things worth knowing before changing any of this.**
 
@@ -119,28 +110,9 @@ becomes solid ink, the waveform and transport glyphs stay as paper. Run
 via A8 recolored black, so its panel's own Bayer threshold passes pure
 black/white straight through instead of re-dithering a gradient.
 
-**Per-target sizes and placement.** The brief was 64 px centered above the
-title; three targets could not take that without pushing the SSID or the
-network list off-screen, so:
-
-- **Dial** - 48 px, centered, top area of the setup screen. The setup state
-  reuses the now-playing layout, leaving roughly a 45 px band between the
-  header's zone label and the now-playing group.
-- **Tough** - 64 px, centered. The vertical rhythm below is tightened to pay
-  for it; the SSID keeps its size-2 prominence and the scan list still shows
-  five rows.
-- **Frame** - 64 px, centered in the artwork placeholder, drawn only when no
-  artwork has ever loaded, which is exactly the boot and setup state.
-- **Slate** - 64 px, left-aligned at the top of the stack, matching that
-  screen's left-aligned layout rather than centering one element on its own.
-- **Dial Lab, Twist, Remote** - 48 px, centered; text below shifts down 36 px.
-- **Joy** - 32 px, top-right badge. Its 128x128 panel already runs from y=6 to
-  y=115; nothing larger fits above the title without losing the SSID or the
-  scan rows.
-- **Kizz** - no mark. Its provisioning screen is a deliberate character
-  illustration and the mark would sit on the face. Kizz is also the one
-  product not branded "HiPhi" (see the product table in issue #164), so the
-  corporate mark is the wrong signal there.
+**Size and placement on the Dial.** 48 px, centered, top area of the setup
+screen. The setup state reuses the now-playing layout, leaving roughly a 45 px
+band between the header's zone label and the now-playing group.
 
 ## LVGL Integration
 
